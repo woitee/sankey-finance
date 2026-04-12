@@ -1,4 +1,4 @@
-export type Cat1 = 'MUST' | 'WANT' | 'INCOME';
+export type Cat1 = 'MUST' | 'WANT' | 'INCOME' | 'TRANSFER';
 
 export type Cat2 = string;
 

@@ -1,10 +1,7 @@
 import { useState, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { Transaction } from '../../types/transaction';
-
-function formatCZK(value: number): string {
-  return value.toLocaleString('cs-CZ') + ' CZK';
-}
+import { formatCurrency } from '../../utils/currency';
 
 type Level = 'cat1' | 'cat2' | 'cat3';
 
@@ -59,7 +56,7 @@ export function CategoryBreakdown({ transactions }: { transactions: Transaction[
   const option = {
     tooltip: {
       trigger: 'item' as const,
-      formatter: (params: any) => `${params.name}<br/><strong>${formatCZK(params.value)}</strong> (${params.percent}%)`,
+      formatter: (params: any) => `${params.name}<br/><strong>${formatCurrency(params.value)}</strong> (${params.percent}%)`,
     },
     series: [
       {

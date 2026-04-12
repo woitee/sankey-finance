@@ -73,7 +73,7 @@ def extract_header(pages) -> dict:
         "period": "",
         "openingBalance": 0.0,
         "closingBalance": 0.0,
-        "totalCredits": 0.0,
+        "totalIncome": 0.0,
         "totalDebits": 0.0,
     }
 
@@ -106,9 +106,9 @@ def extract_header(pages) -> dict:
     if header["closingBalance"] == 0.0:
         header["closingBalance"] = find_amount(r"z.statek:\s*([\d\s,]+)")
 
-    header["totalCredits"] = find_amount(r"[Pp]\u0159ips\xe1no\s+na\s+\xfa[čc]et:\s*([\d\s,]+)")
-    if header["totalCredits"] == 0.0:
-        header["totalCredits"] = find_amount(r"na.*et:\s*([\d\s,]+)")
+    header["totalIncome"] = find_amount(r"[Pp]\u0159ips\xe1no\s+na\s+\xfa[čc]et:\s*([\d\s,]+)")
+    if header["totalIncome"] == 0.0:
+        header["totalIncome"] = find_amount(r"na.*et:\s*([\d\s,]+)")
 
     header["totalDebits"] = find_amount(r"[Oo]deps\xe1no\s+z\s+\xfa[čc]tu:\s*([\d\s,]+)")
     if header["totalDebits"] == 0.0:
@@ -168,9 +168,43 @@ def extract_transactions(pages) -> list[dict]:
                 tx_type = classify_transaction_type(type_parts[0]) if type_parts else "other"
 
                 # Parse name and account identifier
+                # Column 2 format: "Name\nAccount_or_Card"
+                # - Card payments: "Cardholder Name\n****1234"  → source is cardholder
+                # - Outgoing transfers: "Recipient Name\nRecipient IBAN" → source is account owner (implicit)
+                # - Incoming transfers: "Sender Name\nSender IBAN" or just "Sender IBAN" → show sender
                 name_parts = name_raw.split("\n")
-                cardholder_name = name_parts[0].strip() if name_parts else ""
-                account_identifier = name_parts[1].strip() if len(name_parts) > 1 else ""
+                line1 = name_parts[0].strip() if name_parts else ""
+                line2 = name_parts[1].strip() if len(name_parts) > 1 else ""
+
+                OUTGOING_TYPES = ("platba_kartou", "odchozi_uhrada", "trvaly_prikaz")
+                INCOMING_TYPES = ("prichozi_uhrada", "vraceni_penez", "odmena_unity")
+
+                def looks_like_account(s: str) -> bool:
+                    # IBAN (CZ...) or local account number (digits/digits)
+                    return bool(re.match(r'^[A-Z]{2}\d', s) or re.match(r'^\d+/\d+$', s))
+
+                if tx_type in OUTGOING_TYPES:
+                    if tx_type == "platba_kartou":
+                        # line1 = cardholder (source), line2 = masked card
+                        cardholder_name = line1
+                        account_identifier = line2
+                    else:
+                        # line1 = recipient name (or IBAN), line2 = recipient IBAN
+                        # Source is the account owner — not in this row, leave blank
+                        cardholder_name = ""
+                        account_identifier = line2 if line2 else line1
+                elif tx_type in INCOMING_TYPES:
+                    # line1 = sender name (or IBAN if no name), line2 = sender IBAN
+                    if looks_like_account(line1):
+                        # No name — use account number as display fallback
+                        cardholder_name = line1
+                        account_identifier = line1
+                    else:
+                        cardholder_name = line1
+                        account_identifier = line2
+                else:
+                    cardholder_name = line1
+                    account_identifier = line2
 
                 # Parse details - clean up newlines
                 details = details_raw.replace("\n", " ").strip()
@@ -217,7 +251,7 @@ def parse_statement(pdf_path: str) -> dict:
         "accountNumber": header["accountNumber"],
         "openingBalance": header["openingBalance"],
         "closingBalance": header["closingBalance"],
-        "totalCredits": header["totalCredits"],
+        "totalIncome": header["totalIncome"],
         "totalDebits": header["totalDebits"],
         "transactions": transactions,
     }

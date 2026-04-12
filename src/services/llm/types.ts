@@ -10,10 +10,22 @@ export interface CategorizationResponse {
   confidence: number;
 }
 
+export interface RuleSuggestion {
+  pattern: string;
+  field: 'merchantName' | 'details';
+  matchType: 'contains' | 'exact' | 'startsWith';
+  cat3: string;
+}
+
+export interface CategorizationResult {
+  responses: CategorizationResponse[];
+  ruleSuggestions: RuleSuggestion[];
+}
+
 export interface LLMProvider {
   name: string;
   categorize(
     requests: CategorizationRequest[],
     validCat3Values: string[],
-  ): Promise<CategorizationResponse[]>;
+  ): Promise<CategorizationResult>;
 }

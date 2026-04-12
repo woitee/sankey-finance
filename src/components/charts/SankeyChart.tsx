@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { SankeyData } from '../../types/chart';
-
-function formatCZK(value: number): string {
-  return value.toLocaleString('cs-CZ') + ' CZK';
-}
+import { formatCurrency } from '../../utils/currency';
 
 export function SankeyChart({
   data,
@@ -40,9 +37,9 @@ export function SankeyChart({
       triggerOn: 'mousemove' as const,
       formatter: (params: any) => {
         if (params.dataType === 'edge') {
-          return `${params.data.source} → ${params.data.target}<br/><strong>${formatCZK(params.data.value)}</strong>`;
+          return `${params.data.source} → ${params.data.target}<br/><strong>${formatCurrency(params.data.value)}</strong>`;
         }
-        return `<strong>${params.name}</strong><br/>${formatCZK(params.value)}`;
+        return `<strong>${params.name}</strong><br/>${formatCurrency(params.value)}`;
       },
     },
     series: [
@@ -53,6 +50,7 @@ export function SankeyChart({
         orient: 'horizontal' as const,
         nodeAlign: 'left' as const,
         layoutIterations: 32,
+        animationDuration: 250,
         emphasis: { focus: 'adjacency' as const },
         lineStyle: { color: 'source' as const, curveness: 0.4, opacity: 0.25 },
         label: {
@@ -60,7 +58,7 @@ export function SankeyChart({
           fontSize: 12,
           color: '#b0b8c8',
           formatter: (params: any) => {
-            return `${params.name}  ${formatCZK(params.value)}`;
+            return `${params.name}  ${formatCurrency(params.value)}`;
           },
         },
         nodeWidth: 18,

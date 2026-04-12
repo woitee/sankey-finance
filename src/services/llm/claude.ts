@@ -1,5 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { LLMProvider, CategorizationRequest, CategorizationResponse } from './types';
+import type {
+  LLMProvider,
+  CategorizationRequest,
+  CategorizationResponse,
+  CategorizationResult,
+  RuleSuggestion,
+} from './types';
 
 const BATCH_SIZE = 20;
 
@@ -17,43 +23,48 @@ export class ClaudeProvider implements LLMProvider {
   async categorize(
     requests: CategorizationRequest[],
     validCat3Values: string[],
-  ): Promise<CategorizationResponse[]> {
-    const results: CategorizationResponse[] = [];
+  ): Promise<CategorizationResult> {
+    const allResponses: CategorizationResponse[] = [];
+    const allRules: RuleSuggestion[] = [];
 
     for (let i = 0; i < requests.length; i += BATCH_SIZE) {
       const batch = requests.slice(i, i + BATCH_SIZE);
-      const batchResults = await this.categorizeBatch(batch, validCat3Values);
-      results.push(...batchResults);
+      const result = await this.categorizeBatch(batch, validCat3Values);
+      allResponses.push(...result.responses);
+      allRules.push(...result.ruleSuggestions);
     }
 
-    return results;
+    return { responses: allResponses, ruleSuggestions: deduplicateRules(allRules) };
   }
 
   private async categorizeBatch(
     batch: CategorizationRequest[],
     validCat3Values: string[],
-  ): Promise<CategorizationResponse[]> {
+  ): Promise<CategorizationResult> {
     const transactionList = batch
       .map(
         (r, i) =>
-          `${i + 1}. Merchant: "${r.merchantName}" | Details: "${r.details}" | Amount: ${r.amount} CZK | Type: ${r.transactionType}`,
+          `${i + 1}. Merchant: "${r.merchantName}" | Details: "${r.details}" | Amount: ${r.amount} | Type: ${r.transactionType}`,
       )
       .join('\n');
 
     const response = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: `You are a financial transaction categorizer for Czech bank statements. Given transaction details, assign the most appropriate cat3 category from the provided list. Return ONLY a JSON array, no other text.`,
+      max_tokens: 2048,
+      system: `You are a financial transaction categorizer. Assign cat3 categories and suggest reusable rules.
+Return ONLY a JSON object — no other text:
+{
+  "categories": [{"index": 1, "cat3": "category_name"}, ...],
+  "rules": [{"pattern": "...", "field": "merchantName|details", "matchType": "contains|exact|startsWith", "cat3": "category_name"}]
+}
+Rules should capture patterns that would reliably identify future transactions (e.g. merchant name substring). Only suggest rules with high confidence. Omit rules for one-off transactions.`,
       messages: [
         {
           role: 'user',
           content: `Valid cat3 categories: ${JSON.stringify(validCat3Values)}
 
 Transactions to categorize:
-${transactionList}
-
-Respond with a JSON array, one entry per transaction:
-[{"index": 1, "cat3": "category_name"}, ...]`,
+${transactionList}`,
         },
       ],
     });
@@ -62,21 +73,55 @@ Respond with a JSON array, one entry per transaction:
       response.content[0].type === 'text' ? response.content[0].text : '';
 
     try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) return batch.map(() => ({ cat3: 'uncategorized', confidence: 0 }));
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return fallback(batch);
 
-      const parsed: Array<{ index: number; cat3: string }> = JSON.parse(jsonMatch[0]);
-      return batch.map((_, i) => {
-        const entry = parsed.find(p => p.index === i + 1);
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        categories?: Array<{ index: number; cat3: string }>;
+        rules?: Array<{ pattern: string; field: string; matchType: string; cat3: string }>;
+      };
+
+      const responses: CategorizationResponse[] = batch.map((_, i) => {
+        const entry = parsed.categories?.find(p => p.index === i + 1);
         const cat3 = entry?.cat3 || 'uncategorized';
         const isValid = validCat3Values.includes(cat3);
-        return {
-          cat3: isValid ? cat3 : 'uncategorized',
-          confidence: isValid ? 0.8 : 0,
-        };
+        return { cat3: isValid ? cat3 : 'uncategorized', confidence: isValid ? 0.8 : 0 };
       });
+
+      const ruleSuggestions: RuleSuggestion[] = (parsed.rules ?? [])
+        .filter(r =>
+          r.pattern?.trim() &&
+          (r.field === 'merchantName' || r.field === 'details') &&
+          ['contains', 'exact', 'startsWith'].includes(r.matchType) &&
+          validCat3Values.includes(r.cat3),
+        )
+        .map(r => ({
+          pattern: r.pattern.trim(),
+          field: r.field as 'merchantName' | 'details',
+          matchType: r.matchType as 'contains' | 'exact' | 'startsWith',
+          cat3: r.cat3,
+        }));
+
+      return { responses, ruleSuggestions };
     } catch {
-      return batch.map(() => ({ cat3: 'uncategorized', confidence: 0 }));
+      return fallback(batch);
     }
   }
+}
+
+function fallback(batch: CategorizationRequest[]): CategorizationResult {
+  return {
+    responses: batch.map(() => ({ cat3: 'uncategorized', confidence: 0 })),
+    ruleSuggestions: [],
+  };
+}
+
+function deduplicateRules(rules: RuleSuggestion[]): RuleSuggestion[] {
+  const seen = new Set<string>();
+  return rules.filter(r => {
+    const key = `${r.field}:${r.matchType}:${r.pattern.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

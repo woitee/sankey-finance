@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "parse": "python scripts/parse_statement.py"
+    "parse": "python scripts/parse_statement.py",
+    "migrate": "npx tsx scripts/migrate_to_convex.ts",
+    "convex": "convex dev"
   },
   "keywords": [],
   "author": "",
@@ -15,15 +17,20 @@
   "description": "",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "convex": "^1.35.1",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
+    "pdfjs-dist": "^5.6.205",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dotenv": "^17.4.1",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.2"
   }

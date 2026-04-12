@@ -21,7 +21,8 @@ export interface Transaction {
   cat3: string | null;
   cat2: string | null;
   cat1: string | null;
-  categorizationSource: 'correction' | 'llm' | 'manual' | null;
+  categorizationSource: 'rule' | 'correction' | 'llm' | 'manual' | null;
+  ruleId?: string | null;
   groupId: string | null;
   groupLabel: string | null;
 }
@@ -31,7 +32,7 @@ export interface ParsedStatement {
   accountNumber: string;
   openingBalance: number;
   closingBalance: number;
-  totalCredits: number;
+  totalIncome: number;
   totalDebits: number;
   transactions: Transaction[];
 }

@@ -3,42 +3,72 @@ import type { CorrectionsDB } from '../types/category';
 import { resolveCategory, getAllCat3Values } from '../config/categories';
 import { findCorrection } from './corrections';
 import { createLLMProvider } from './llm';
-import type { CategorizationRequest } from './llm';
+import type { CategorizationRequest, RuleSuggestion } from './llm';
+
+export interface ActiveRule {
+  id?: string;
+  pattern: string;
+  field: 'merchantName' | 'details';
+  matchType: 'contains' | 'exact' | 'startsWith';
+  cat3: string;
+  cat2: string | null;
+  cat1: string | null;
+}
+
+export interface CategorizationResult {
+  transactions: Transaction[];
+  ruleSuggestions: RuleSuggestion[];
+}
+
+export function matchesRule(tx: Transaction, rule: ActiveRule): boolean {
+  const value = rule.field === 'merchantName' ? tx.merchantName : tx.details;
+  const p = rule.pattern.toLowerCase();
+  const v = (value ?? '').toLowerCase();
+  if (rule.matchType === 'exact') return v === p;
+  if (rule.matchType === 'startsWith') return v.startsWith(p);
+  return v.includes(p);
+}
 
 export async function categorizeTransactions(
   transactions: Transaction[],
   correctionsDB: CorrectionsDB,
-  options: { useLLM?: boolean } = {},
-): Promise<Transaction[]> {
-  const { useLLM = true } = options;
+  options: { useLLM?: boolean; activeRules?: ActiveRule[] } = {},
+): Promise<CategorizationResult> {
+  const { useLLM = true, activeRules = [] } = options;
   const result = [...transactions];
   const needsLLM: { index: number; request: CategorizationRequest }[] = [];
 
-  // Step 1: Apply corrections and auto-categorize income
+  // Step 1: Apply rules, then corrections, then auto-categorize income
   for (let i = 0; i < result.length; i++) {
     const tx = { ...result[i] };
     result[i] = tx;
 
-    // Skip already categorized
     if (tx.cat3) continue;
 
-    // Auto-categorize income transactions
+    // Active rules first
+    const matchedRule = activeRules.find(r => matchesRule(tx, r));
+    if (matchedRule) {
+      applyCategories(tx, matchedRule.cat3, 'rule', matchedRule.cat2 ?? undefined, matchedRule.cat1 ?? undefined);
+      tx.ruleId = matchedRule.id ?? null;
+      continue;
+    }
+
+    // Auto-categorize income
     if (tx.amount > 0) {
       if (tx.type === 'prichozi_uhrada' || tx.type === 'odmena_unity' || tx.type === 'vraceni_penez') {
-        // Check if it looks like salary (large regular amount)
         const cat3 = tx.type === 'vraceni_penez' ? 'refund'
           : tx.type === 'odmena_unity' ? 'cashback'
           : tx.amount > 50000 ? 'salary'
           : 'transfer_in';
-        applyCategories(tx, cat3, 'correction');
+        applyCategories(tx, cat3, 'rule');
         continue;
       }
     }
 
-    // Check corrections DB
+    // Legacy corrections DB
     const correction = findCorrection(tx.merchantName, tx.details, correctionsDB.corrections);
     if (correction) {
-      applyCategories(tx, correction.cat3, 'correction', correction.cat2, correction.cat1);
+      applyCategories(tx, correction.cat3, 'rule', correction.cat2, correction.cat1);
       continue;
     }
 
@@ -57,37 +87,40 @@ export async function categorizeTransactions(
   }
 
   // Step 2: LLM batch categorization
+  let ruleSuggestions: RuleSuggestion[] = [];
+
   if (needsLLM.length > 0 && useLLM) {
     try {
       const provider = createLLMProvider();
       const validCat3 = getAllCat3Values();
-      const responses = await provider.categorize(
+      const llmResult = await provider.categorize(
         needsLLM.map(n => n.request),
         validCat3,
       );
 
       for (let j = 0; j < needsLLM.length; j++) {
         const { index } = needsLLM[j];
-        const response = responses[j];
+        const response = llmResult.responses[j];
         const tx = { ...result[index] };
         result[index] = tx;
         applyCategories(tx, response.cat3, 'llm');
       }
+
+      ruleSuggestions = llmResult.ruleSuggestions;
     } catch (err) {
       console.error('LLM categorization failed:', err);
-      // Leave uncategorized transactions as-is
     }
   }
 
-  return result;
+  return { transactions: result, ruleSuggestions };
 }
 
 function applyCategories(
   tx: Transaction,
   cat3: string,
-  source: 'correction' | 'llm' | 'manual',
-  cat2Override?: string,
-  cat1Override?: string,
+  source: 'rule' | 'llm' | 'manual',
+  cat2Override?: string | null,
+  cat1Override?: string | null,
 ) {
   tx.cat3 = cat3;
   const resolved = resolveCategory(cat3);

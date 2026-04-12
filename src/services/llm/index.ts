@@ -1,7 +1,7 @@
 import type { LLMProvider } from './types';
 import { ClaudeProvider } from './claude';
 
-export type { LLMProvider, CategorizationRequest, CategorizationResponse } from './types';
+export type { LLMProvider, CategorizationRequest, CategorizationResponse, RuleSuggestion } from './types';
 
 export function createLLMProvider(providerName = 'claude'): LLMProvider {
   switch (providerName) {

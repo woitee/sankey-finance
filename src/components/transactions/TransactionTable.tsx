@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Transaction } from '../../types/transaction';
+import type { ActiveRule } from '../../services/categorizer';
 import { getAllCat3Values, getAllCat2Values, resolveCategory } from '../../config/categories';
 import { extractGroups, type TransactionGroup } from '../../transforms/groups';
 import { ComboBox } from '../ComboBox';
-
-function formatCZK(value: number): string {
-  return value.toLocaleString('cs-CZ') + ' CZK';
-}
+import { formatCurrency } from '../../utils/currency';
 
 export type CategoryFilter = {
   text?: string;
@@ -64,6 +62,8 @@ export function TransactionTable({
   onGroup,
   onUngroup,
   onUpdateGroupLabel,
+  activeRules = [],
+  onRuleClick,
 }: {
   transactions: Transaction[];
   onCorrect: (payload: CorrectionPayload) => void;
@@ -71,6 +71,8 @@ export function TransactionTable({
   onGroup: (txIds: string[], label?: string) => void;
   onUngroup: (groupId: string) => void;
   onUpdateGroupLabel: (groupId: string, label: string) => void;
+  activeRules?: ActiveRule[];
+  onRuleClick?: (ruleId: string) => void;
 }) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [text, setText] = useState(initialFilter.text ?? '');
@@ -82,6 +84,11 @@ export function TransactionTable({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [editingGroupLabel, setEditingGroupLabel] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>(null);
+
+  const ruleMap = useMemo(
+    () => new Map(activeRules.filter(r => r.id).map(r => [r.id!, r])),
+    [activeRules],
+  );
 
   useEffect(() => {
     setText(initialFilter.text ?? '');
@@ -253,10 +260,10 @@ export function TransactionTable({
           {tx.merchantName || tx.details}
         </td>
         <td style={{ padding: '8px 12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-          {tx.cardholderName.includes('Tereza') ? 'Tereza' : 'Vojtech'}
+          {tx.cardholderName}
         </td>
         <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: tx.amount > 0 ? '#22c55e' : '#e2e8f0', whiteSpace: 'nowrap' }}>
-          {formatCZK(tx.amount)}
+          {formatCurrency(tx.amount)}
         </td>
         {/* Cat1 */}
         <td style={{ padding: '8px 12px', cursor: 'pointer' }} onClick={() => { if (!isEditingCat1) setEditing({ txId: tx.id, column: 'cat1' }); }}>
@@ -289,7 +296,24 @@ export function TransactionTable({
             </div>
           ) : <span style={{ borderBottom: '1px dashed #6366f1', color: tx.cat3 ? '#cdd6f4' : '#f59e0b' }}>{tx.cat3 || 'click to set'}</span>}
         </td>
-        <td style={{ padding: '8px 12px', color: '#64748b', fontSize: 11 }}>{tx.categorizationSource}</td>
+        <td style={{ padding: '8px 12px', fontSize: 11 }}>
+          {tx.ruleId && ruleMap.has(tx.ruleId) ? (
+            <span
+              title={`${ruleMap.get(tx.ruleId)!.field} ${ruleMap.get(tx.ruleId)!.matchType} "${ruleMap.get(tx.ruleId)!.pattern}"`}
+              onClick={() => onRuleClick?.(tx.ruleId!)}
+              style={{ color: '#89b4fa', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
+              rule: {ruleMap.get(tx.ruleId)!.pattern}
+            </span>
+          ) : tx.ruleId ? (
+            <span style={{ color: '#64748b', fontStyle: 'italic' }}>deleted rule</span>
+          ) : (
+            <span style={{ color: '#64748b' }}>
+              {tx.categorizationSource === null ? '—'
+                : tx.categorizationSource === 'correction' ? 'llm'
+                : tx.categorizationSource}
+            </span>
+          )}
+        </td>
       </tr>
     );
   };
@@ -331,7 +355,7 @@ export function TransactionTable({
         </td>
         <td colSpan={2} style={{ padding: '8px 12px', textAlign: 'right' }}>
           <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: group.netAmount > 0 ? '#22c55e' : group.netAmount < 0 ? '#e87461' : '#94a3b8' }}>
-            Net: {formatCZK(group.netAmount)}
+            Net: {formatCurrency(group.netAmount)}
           </span>
         </td>
         <td style={{ padding: '8px 12px' }}>
@@ -394,7 +418,7 @@ export function TransactionTable({
             Group
           </button>
           <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 'auto' }}>
-            Net: <strong style={{ color: selectedNetAmount > 0 ? '#22c55e' : selectedNetAmount < 0 ? '#e87461' : '#94a3b8' }}>{formatCZK(selectedNetAmount)}</strong>
+            Net: <strong style={{ color: selectedNetAmount > 0 ? '#22c55e' : selectedNetAmount < 0 ? '#e87461' : '#94a3b8' }}>{formatCurrency(selectedNetAmount)}</strong>
           </span>
         </div>
       )}

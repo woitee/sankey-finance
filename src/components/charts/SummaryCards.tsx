@@ -1,8 +1,5 @@
 import type { StatementSummary } from '../../transforms/summary';
-
-function formatCZK(value: number): string {
-  return value.toLocaleString('cs-CZ') + ' CZK';
-}
+import { formatCurrency } from '../../utils/currency';
 
 export function SummaryCards({ summary }: { summary: StatementSummary }) {
   const cards = [
@@ -34,7 +31,7 @@ export function SummaryCards({ summary }: { summary: StatementSummary }) {
             {card.label}
           </div>
           <div style={{ color: '#e2e8f0', fontSize: 22, fontWeight: 700 }}>
-            {formatCZK(card.value)}
+            {formatCurrency(card.value)}
           </div>
         </div>
       ))}

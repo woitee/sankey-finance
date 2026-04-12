@@ -1,6 +1,6 @@
 import type { CorrectionEntry, CorrectionsDB } from '../types/category';
 
-function normalizeMerchant(raw: string): string {
+export function normalizeMerchant(raw: string): string {
   return raw
     .toLowerCase()
     .normalize('NFD')
@@ -41,20 +41,8 @@ export function findCorrection(
   return null;
 }
 
-export async function loadCorrections(): Promise<CorrectionsDB> {
-  const res = await fetch('/api/corrections');
-  return res.json();
-}
-
-export async function saveCorrections(db: CorrectionsDB): Promise<void> {
-  await fetch('/api/corrections', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(db),
-  });
-}
-
-export function addCorrection(
+/** Pure in-memory update — does not persist to Convex */
+export function addCorrectionLocally(
   db: CorrectionsDB,
   merchantPattern: string,
   cats: { cat3: string; cat2?: string; cat1?: string },
