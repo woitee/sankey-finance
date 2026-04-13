@@ -15,7 +15,7 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 ## Features
 
 - **Import** — PDF bank statements (Air Bank CZ, CSOB CZ) via built-in PDF parsers; AI-assisted parser for other formats
-- **Auto-categorize** — active rules run first, then Claude Haiku for anything remaining
+- **Auto-categorize** — active rules run first, then LLM for anything remaining
 - **3-tier categories** — `cat1` (MUST / WANT / INCOME) → `cat2` (Food, Transport…) → `cat3` (groceries, fuel…)
 - **Categorization rules** — pattern matching on merchant name or details; candidate rules from AI require approval
 - **Manual overrides** — click any cell in the transaction table to correct a category; stored as corrections
@@ -45,11 +45,7 @@ npm run dev          # http://localhost:5173
 
 ## Importing statements
 
-**Air Bank PDF (legacy Python script):**
-```bash
-python scripts/parse_statement.py path/to/statement.pdf --output data/parsed/2025-03.json
-```
-Then use the **Import** button in the UI to upload the JSON.
+Use the **Import** button in the UI to upload the JSON.
 
 **Built-in PDF import:**
 
