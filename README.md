@@ -9,13 +9,13 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 | Frontend | React + TypeScript + Vite |
 | Database | Convex (reactive, serverless) |
 | Charts | ECharts (`echarts-for-react`) |
-| AI | Claude Haiku (`@anthropic-ai/sdk`) |
+| AI | Vercel AI SDK (`ai`) — Anthropic / OpenAI / Google |
 | PDF parsing | Python + pdfplumber |
 
 ## Features
 
 - **Import** — PDF bank statements (Air Bank CZ, CSOB CZ) via built-in PDF parsers; AI-assisted parser for other formats
-- **Auto-categorize** — active rules run first, then LLM for anything remaining
+- **Auto-categorize** — active rules run first, then LLM (server-side via Vite plugin) for anything remaining
 - **3-tier categories** — `cat1` (MUST / WANT / INCOME) → `cat2` (Food, Transport…) → `cat3` (groceries, fuel…)
 - **Categorization rules** — pattern matching on merchant name or details; candidate rules from AI require approval
 - **Manual overrides** — click any cell in the transaction table to correct a category; stored as corrections
@@ -32,7 +32,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Fill in VITE_CONVEX_URL, VITE_CONVEX_SITE_URL, VITE_ANTHROPIC_API_KEY
+# Fill in VITE_CONVEX_URL, VITE_CONVEX_SITE_URL, ANTHROPIC_API_KEY (or OPENAI/GOOGLE)
 # TOKEN_ENCRYPTION_KEY must be set as a Convex server env var:
 npx convex env set TOKEN_ENCRYPTION_KEY $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
