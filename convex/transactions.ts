@@ -189,6 +189,7 @@ export const batchUpdateCategories = mutation({
         cat2: v.union(v.string(), v.null()),
         cat1: v.union(v.string(), v.null()),
         categorizationSource: v.union(
+          v.literal("rule"),
           v.literal("correction"),
           v.literal("llm"),
           v.literal("manual"),
@@ -205,6 +206,15 @@ export const batchUpdateCategories = mutation({
   },
 });
 
+
+export const batchDelete = mutation({
+  args: { ids: v.array(v.id("transactions")) },
+  handler: async (ctx, { ids }) => {
+    for (const id of ids) {
+      await ctx.db.delete(id);
+    }
+  },
+});
 
 /** One-shot migration: rename legacy "correction" source to "llm". */
 export const migrateCorrectionToLlm = mutation({

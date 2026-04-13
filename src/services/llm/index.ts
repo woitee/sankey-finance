@@ -1,13 +1,8 @@
-import type { LLMProvider } from './types';
-import { ClaudeProvider } from './claude';
+import { AISDKProvider } from './ai-sdk-provider';
 
 export type { LLMProvider, CategorizationRequest, CategorizationResponse, RuleSuggestion } from './types';
+export { AISDKProvider };
 
-export function createLLMProvider(providerName = 'claude'): LLMProvider {
-  switch (providerName) {
-    case 'claude':
-      return new ClaudeProvider();
-    default:
-      throw new Error(`Unknown LLM provider: ${providerName}`);
-  }
+export function createLLMProvider() {
+  return new AISDKProvider();
 }
