@@ -64,6 +64,9 @@ export function TransactionTable({
   onUpdateGroupLabel,
   activeRules = [],
   onRuleClick,
+  onDelete,
+  onRecategorizeWithAI,
+  categorizing = false,
 }: {
   transactions: Transaction[];
   onCorrect: (payload: CorrectionPayload) => void;
@@ -73,6 +76,9 @@ export function TransactionTable({
   onUpdateGroupLabel: (groupId: string, label: string) => void;
   activeRules?: ActiveRule[];
   onRuleClick?: (ruleId: string) => void;
+  onDelete?: (ids: string[]) => void;
+  onRecategorizeWithAI?: (ids: string[]) => void;
+  categorizing?: boolean;
 }) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [text, setText] = useState(initialFilter.text ?? '');
@@ -393,30 +399,55 @@ export function TransactionTable({
         </span>
       </div>
 
-      {/* Group toolbar */}
-      {selectedIds.size >= 2 && (
+      {/* Selection toolbar */}
+      {selectedIds.size >= 1 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-          background: '#6366f10d', border: '1px solid #6366f133', borderRadius: 8, marginBottom: 12,
+          background: '#6366f10d', border: '1px solid #6366f133', borderRadius: 8, marginBottom: 12, flexWrap: 'wrap',
         }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size} selected</span>
-          <input
-            type="text"
-            placeholder="Group label (optional)..."
-            value={groupLabelInput}
-            onChange={e => setGroupLabelInput(e.target.value)}
-            style={{ ...selectStyle, flex: '0 1 220px', fontSize: 12, padding: '6px 10px' }}
-          />
-          <button
-            onClick={() => {
-              onGroup([...selectedIds], groupLabelInput || undefined);
-              setSelectedIds(new Set());
-              setGroupLabelInput('');
-            }}
-            style={{ ...btnStyle, background: '#6366f1', color: '#fff', borderColor: '#6366f1', fontWeight: 600 }}
-          >
-            Group
-          </button>
+
+          {onRecategorizeWithAI && (
+            <button
+              disabled={categorizing}
+              onClick={() => { onRecategorizeWithAI([...selectedIds]); setSelectedIds(new Set()); }}
+              style={{ ...btnStyle, background: '#6366f1', color: '#fff', borderColor: '#6366f1', fontWeight: 600, opacity: categorizing ? 0.6 : 1 }}
+            >
+              {categorizing ? 'Categorizing…' : 'Recategorize with AI'}
+            </button>
+          )}
+
+          {onDelete && (
+            <button
+              onClick={() => { onDelete([...selectedIds]); setSelectedIds(new Set()); }}
+              style={{ ...btnStyle, color: '#e87461', borderColor: '#e8746133' }}
+            >
+              Delete
+            </button>
+          )}
+
+          {selectedIds.size >= 2 && (
+            <>
+              <input
+                type="text"
+                placeholder="Group label (optional)..."
+                value={groupLabelInput}
+                onChange={e => setGroupLabelInput(e.target.value)}
+                style={{ ...selectStyle, flex: '0 1 220px', fontSize: 12, padding: '6px 10px' }}
+              />
+              <button
+                onClick={() => {
+                  onGroup([...selectedIds], groupLabelInput || undefined);
+                  setSelectedIds(new Set());
+                  setGroupLabelInput('');
+                }}
+                style={{ ...btnStyle, fontWeight: 600 }}
+              >
+                Group
+              </button>
+            </>
+          )}
+
           <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 'auto' }}>
             Net: <strong style={{ color: selectedNetAmount > 0 ? '#22c55e' : selectedNetAmount < 0 ? '#e87461' : '#94a3b8' }}>{formatCurrency(selectedNetAmount)}</strong>
           </span>

@@ -17,6 +17,8 @@ import { TransactionTable, type CategoryFilter, type CorrectionPayload } from '.
 import { DateRangePicker } from './components/DateRangePicker';
 import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
+import { CategorizeModal } from './components/CategorizeModal';
+import type { CategorizeResult } from './components/CategorizeModal';
 import { getAllCat2Values } from './config/categories';
 import { resolveGroups, generateGroupId } from './transforms/groups';
 
@@ -48,7 +50,7 @@ export default function App() {
   const [to, setTo] = useState(defaults.to);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [showImport, setShowImport] = useState(false);
-  const [categorizing, setCategorizing] = useState(false);
+  const [categorizeModalTxs, setCategorizeModalTxs] = useState<TxDoc[] | null>(null);
   const [showCat3, setShowCat3] = useState(false);
   const [txFilter, setTxFilter] = useState<CategoryFilter>({});
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
@@ -71,6 +73,7 @@ export default function App() {
   const updateGroupMutation = useMutation(api.transactions.updateGroup);
   const upsertCorrection = useMutation(api.corrections.upsert);
   const batchCreateCandidates = useMutation(api.rules.batchCreateCandidates);
+  const batchDeleteMutation = useMutation(api.transactions.batchDelete);
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const nicknameMap = useMemo(() => {
@@ -199,16 +202,11 @@ export default function App() {
     );
   }, [loading, transactions, correctionsDB, from, to, persistCategorization]);
 
-  // ── AI categorize ────────────────────────────────────────────────────────────
-  const handleCategorize = useCallback(async () => {
-    if (!transactions.length) return;
-    setCategorizing(true);
-    try {
-      // Step 1: run rules + LLM for uncategorized transactions
-      const result = await categorizeTransactions(transactions, correctionsDB, { activeRules });
+  // ── AI categorize (modal) ────────────────────────────────────────────────────
+  const handleCategorizeModalDone = useCallback(
+    async (result: CategorizeResult) => {
       let finalTxs = result.transactions;
 
-      // Step 2: save LLM rule suggestions as candidates and apply them immediately
       if (result.ruleSuggestions.length > 0) {
         const candidates = result.ruleSuggestions.map(r => {
           const resolved = resolveCategory(r.cat3);
@@ -222,14 +220,10 @@ export default function App() {
           };
         });
 
-        // batchCreateCandidates now returns the created rule objects with their IDs
         const newRules = await batchCreateCandidates({ rules: candidates });
 
-        // Apply newly created candidate rules to transactions that the LLM categorized
-        // (override their 'llm' source with 'rule' and stamp the ruleId)
         if (newRules.length > 0) {
           finalTxs = finalTxs.map(tx => {
-            // Only override LLM-categorized transactions (not rules, not manual)
             if (tx.categorizationSource !== 'llm') return tx;
             const matched = newRules.find(r => matchesRule(tx, r as ActiveRule));
             if (!matched) return tx;
@@ -246,11 +240,52 @@ export default function App() {
       }
 
       await persistCategorization(finalTxs);
-    } catch (err) {
-      console.error('Categorization failed:', err);
-    }
-    setCategorizing(false);
-  }, [transactions, correctionsDB, activeRules, persistCategorization, batchCreateCandidates]);
+    },
+    [persistCategorization, batchCreateCandidates],
+  );
+
+  // ── Delete selected ──────────────────────────────────────────────────────────
+  const handleDeleteSelected = useCallback(
+    async (ids: string[]) => {
+      const convexIds = transactions
+        .filter(tx => ids.includes(tx.id))
+        .map(tx => tx._convexId);
+      if (convexIds.length > 0) await batchDeleteMutation({ ids: convexIds });
+    },
+    [transactions, batchDeleteMutation],
+  );
+
+  // ── Recategorize selected with AI (opens modal with reset txs) ───────────────
+  const handleRecategorizeSelected = useCallback(
+    (ids: string[]) => {
+      const selected = transactions.filter(tx => ids.includes(tx.id));
+      if (!selected.length) return;
+      const reset = selected.map(tx => ({
+        ...tx, cat3: null, cat2: null, cat1: null, categorizationSource: null as any,
+      }));
+      setCategorizeModalTxs(reset);
+    },
+    [transactions],
+  );
+
+  // onDone for the recategorize-selected modal (force-saves, bypasses diff check)
+  const handleRecategorizeModalDone = useCallback(
+    async (result: CategorizeResult) => {
+      const idMap = new Map(transactions.map(tx => [tx.id, tx._convexId]));
+      const updates = result.transactions
+        .filter(tx => idMap.has(tx.id))
+        .map(tx => ({
+          id: idMap.get(tx.id)!,
+          cat3: tx.cat3,
+          cat2: tx.cat2,
+          cat1: tx.cat1,
+          categorizationSource: tx.categorizationSource,
+          ...(tx.ruleId ? { ruleId: tx.ruleId as Id<'rules'> } : {}),
+        }));
+      if (updates.length > 0) await batchUpdateCategories({ updates });
+    },
+    [transactions, batchUpdateCategories],
+  );
 
   // ── Corrections ──────────────────────────────────────────────────────────────
   const handleCorrect = useCallback(
@@ -459,13 +494,13 @@ export default function App() {
             Import
           </button>
           <button
-            onClick={handleCategorize}
-            disabled={categorizing}
+            onClick={() => transactions.length > 0 && setCategorizeModalTxs(transactions)}
+            disabled={transactions.length === 0}
             style={{
               padding: '8px 16px',
               borderRadius: 8,
               border: '1px solid #6366f1',
-              cursor: categorizing ? 'wait' : 'pointer',
+              cursor: transactions.length === 0 ? 'not-allowed' : 'pointer',
               fontSize: 14,
               fontWeight: 500,
               background: 'transparent',
@@ -473,7 +508,7 @@ export default function App() {
               marginLeft: 8,
             }}
           >
-            {categorizing ? 'Categorizing...' : 'Categorize with AI'}
+            Categorize with AI
           </button>
         </nav>
       </header>
@@ -592,6 +627,9 @@ export default function App() {
               onUngroup={handleUngroup}
               onUpdateGroupLabel={handleUpdateGroupLabel}
               activeRules={activeRules}
+              onDelete={handleDeleteSelected}
+              onRecategorizeWithAI={handleRecategorizeSelected}
+              categorizing={categorizeModalTxs !== null}
               onRuleClick={ruleId => {
                 setTab('settings');
                 setTimeout(() => {
@@ -615,6 +653,28 @@ export default function App() {
       </main>
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+
+      {categorizeModalTxs && (
+        categorizeModalTxs === transactions ? (
+          <CategorizeModal
+            title="Categorize with AI"
+            transactions={categorizeModalTxs}
+            correctionsDB={correctionsDB}
+            activeRules={activeRules}
+            onDone={handleCategorizeModalDone}
+            onClose={() => setCategorizeModalTxs(null)}
+          />
+        ) : (
+          <CategorizeModal
+            title={`Recategorize ${categorizeModalTxs.length} transaction${categorizeModalTxs.length !== 1 ? 's' : ''}`}
+            transactions={categorizeModalTxs}
+            correctionsDB={correctionsDB}
+            activeRules={activeRules}
+            onDone={handleRecategorizeModalDone}
+            onClose={() => setCategorizeModalTxs(null)}
+          />
+        )
+      )}
     </div>
   );
 }

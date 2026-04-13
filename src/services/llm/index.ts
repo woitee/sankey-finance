@@ -1,8 +1,8 @@
-import { AISDKProvider } from './ai-sdk-provider';
+import { HttpProvider } from './http-provider';
 
 export type { LLMProvider, CategorizationRequest, CategorizationResponse, RuleSuggestion } from './types';
-export { AISDKProvider };
+export { HttpProvider };
 
 export function createLLMProvider() {
-  return new AISDKProvider();
+  return new HttpProvider();
 }

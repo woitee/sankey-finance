@@ -1,5 +1,3 @@
-import { generateText } from 'ai';
-import { createLanguageModel } from '../services/llm/model';
 import type { BankParser, ParsedStatement } from './types';
 
 async function fileToText(file: File): Promise<string> {
@@ -31,42 +29,16 @@ export class LlmParser implements BankParser {
   }
 
   async parse(file: File): Promise<ParsedStatement> {
-    const model = createLanguageModel();
     const text = await fileToText(file);
-
-
-    const { text: responseText } = await generateText({
-      model,
-      messages: [{
-        role: 'user',
-        content: `Parse this bank statement. Return ONLY a valid JSON object matching this schema — no markdown, no explanation:
-{
-  "period": "YYYY-MM",
-  "accountNumber": "string",
-  "openingBalance": 0,
-  "closingBalance": 0,
-  "totalIncome": 0,
-  "totalDebits": 0,
-  "transactions": [{
-    "datePosted": "YYYY-MM-DD",
-    "dateExecuted": "YYYY-MM-DD",
-    "type": "platba_kartou|prichozi_uhrada|odchozi_uhrada|trvaly_prikaz|other",
-    "cardholderName": "",
-    "accountIdentifier": "",
-    "merchantName": "",
-    "details": "",
-    "amount": 0,
-    "fees": 0
-  }]
-}
-Rules: negative amount = money leaving, positive = money arriving.
-
-Statement text:
-${text.slice(0, 60_000)}`,
-      }],
+    const res = await fetch('/api/parse-statement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
     });
-
-    const json = responseText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-    return JSON.parse(json) as ParsedStatement;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(`LLM parse error (${res.status}): ${err.error ?? res.statusText}`);
+    }
+    return res.json() as Promise<ParsedStatement>;
   }
 }
