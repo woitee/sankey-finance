@@ -38,7 +38,7 @@ const responseSchema = z.object({
     field: z.enum(['merchantName', 'details']),
     matchType: z.enum(['contains', 'exact', 'startsWith']),
     cat3: z.string(),
-  })).default([]),
+  })),
 });
 
 interface CategorizationRequest {
@@ -122,7 +122,7 @@ ${transactionList}`,
     return { cat3: isValid ? cat3 : 'uncategorized', confidence: isValid ? 0.8 : 0 };
   });
 
-  const ruleSuggestions = object.rules
+  const ruleSuggestions = (object.rules ?? [])
     .filter(r => r.pattern.trim() && validCat3Values.includes(r.cat3))
     .map(r => ({ ...r, pattern: r.pattern.trim() }));
 
