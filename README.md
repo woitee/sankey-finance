@@ -32,7 +32,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Fill in VITE_CONVEX_URL, VITE_CONVEX_SITE_URL, ANTHROPIC_API_KEY (or OPENAI/GOOGLE)
+# Fill in the required vars from .env.example
 # TOKEN_ENCRYPTION_KEY must be set as a Convex server env var:
 npx convex env set TOKEN_ENCRYPTION_KEY $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
@@ -42,6 +42,19 @@ npx convex dev
 # Start frontend
 npm run dev          # http://localhost:5173
 ```
+
+Environment variables used by the app:
+
+- `VITE_CONVEX_URL` - required; frontend Convex deployment URL
+- `VITE_CONVEX_SITE_URL` - required for bank OAuth from the frontend
+- `CONVEX_SITE_URL` - optional server-side variant of `VITE_CONVEX_SITE_URL`; `convex/bankAuth.ts` accepts either one
+- `LLM_PROVIDER` - optional; one of `anthropic`, `openai`, `google` (defaults to `anthropic`)
+- `LLM_MODEL` - optional; defaults depend on `LLM_PROVIDER`
+- `ANTHROPIC_API_KEY` - required when `LLM_PROVIDER=anthropic`
+- `OPENAI_API_KEY` - required when `LLM_PROVIDER=openai`
+- `GOOGLE_API_KEY` - required when `LLM_PROVIDER=google`
+- `TOKEN_ENCRYPTION_KEY` - required for bank token encryption; used by Convex server code and best set with `npx convex env set ...`
+- `VITE_CURRENCY` - optional UI currency override; defaults to `CZK`
 
 ## Importing statements
 
