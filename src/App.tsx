@@ -129,7 +129,6 @@ export default function App() {
   );
 
   const txLoading = convexTxs === undefined;
-  const loading = txLoading;
 
   // ── Persist categorization changes back to Convex ───────────────────────────
   const persistCategorization = useCallback(
@@ -359,22 +358,6 @@ export default function App() {
     setFrom(newFrom);
     setTo(newTo);
   }, []);
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh',
-          color: '#cdd6f4',
-        }}
-      >
-        Loading...
-      </div>
-    );
-  }
 
   return (
     <div

@@ -45,7 +45,7 @@ export function buildSankeyData(
   };
 
   const incomeTransactions = transactions.filter(t => t.amount > 0);
-  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.cat1 && t.cat1 !== 'INCOME');
+  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.cat1 && t.cat1 !== 'INCOME' && t.cat2);
 
   const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
   const totalExpense = expenseTransactions.reduce((s, t) => s + Math.abs(t.amount), 0);
@@ -80,7 +80,7 @@ export function buildSankeyData(
     if (!cat2Groups[c1]) cat2Groups[c1] = {};
     cat2Groups[c1][c2] = (cat2Groups[c1][c2] ?? 0) + abs;
 
-    if (showCat3) {
+    if (showCat3 && c3) {
       const cat2Key = `${c1}\0${c2}`;
       if (!cat3Groups[cat2Key]) cat3Groups[cat2Key] = {};
       cat3Groups[cat2Key][c3] = (cat3Groups[cat2Key][c3] ?? 0) + abs;
@@ -106,13 +106,19 @@ export function buildSankeyData(
     for (const [c2, total] of Object.entries(cat2Map)) {
       addNode(c2, CAT2_COLORS[c2]);
       addLink(c1, c2, total);
+    }
+  }
 
-      // cat2 → cat3
-      if (showCat3) {
+  // cat2 → cat3 (after all cat1/cat2 nodes are registered, so we can detect cycles)
+  if (showCat3) {
+    const upstreamNodes = new Set(nodes.keys());
+    for (const [c1, cat2Map] of Object.entries(cat2Groups)) {
+      for (const [c2] of Object.entries(cat2Map)) {
         const cat2Key = `${c1}\0${c2}`;
         const c3Map = cat3Groups[cat2Key];
         if (c3Map) {
           for (const [c3, c3Total] of Object.entries(c3Map)) {
+            if (upstreamNodes.has(c3)) continue; // would create a cycle
             addNode(c3);
             addLink(c2, c3, c3Total);
           }
