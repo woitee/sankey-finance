@@ -59,8 +59,9 @@ interface Props {
   transactions: Transaction[];   // already reset if recategorizing
   correctionsDB: CorrectionsDB;
   activeRules: ActiveRule[];
-  onDone: (result: CategorizeResult) => Promise<void>;
+  onDone: (result: CategorizeResult) => Promise<number>; // returns count of newly created candidates
   onClose: () => void;
+  onViewCandidates?: () => void;
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export function CategorizeModal({
   activeRules,
   onDone,
   onClose,
+  onViewCandidates,
 }: Props) {
   const counts = computeDryRunCounts(transactions, correctionsDB, activeRules);
   const [phase, setPhase] = useState<Phase>({ kind: 'preview', counts });
@@ -248,10 +250,10 @@ export function CategorizeModal({
 
       // Step 4: save
       setPhase({ kind: 'saving' });
-      await onDone({ transactions: finalTxs, ruleSuggestions: allRuleSuggestions });
+      const candidatesCreated = await onDone({ transactions: finalTxs, ruleSuggestions: allRuleSuggestions });
 
       const llmCategorized = queue.length;
-      setPhase({ kind: 'done', categorized: counts.byRule + llmCategorized, ruleCount: allRuleSuggestions.length });
+      setPhase({ kind: 'done', categorized: counts.byRule + llmCategorized, ruleCount: candidatesCreated });
     } catch (e: any) {
       clearTick();
       setPhase({ kind: 'error', message: String(e?.message ?? e) });
@@ -344,8 +346,27 @@ export function CategorizeModal({
           <div>
             <StatusLine icon="✓" text={`${phase.categorized} transaction${phase.categorized !== 1 ? 's' : ''} categorized`} color="#a6e3a1" />
             {phase.ruleCount > 0 && (
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 20 }}>
-                {phase.ruleCount} rule suggestion{phase.ruleCount !== 1 ? 's' : ''} saved as candidates.
+              <div style={{
+                marginTop: 16, padding: '14px 16px', borderRadius: 8,
+                background: '#1a1a2e', border: '1px solid #89b4fa44',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#89b4fa' }}>
+                    {phase.ruleCount} rule suggestion{phase.ruleCount !== 1 ? 's' : ''} pending review
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    Approve or reject them in Settings → Candidate Rules
+                  </div>
+                </div>
+                {onViewCandidates && (
+                  <button
+                    onClick={onViewCandidates}
+                    style={{ ...btn('#89b4fa22', '#89b4fa'), border: '1px solid #89b4fa44', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
+                    View →
+                  </button>
+                )}
               </div>
             )}
             <div style={{ marginTop: 20 }}>

@@ -51,6 +51,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [showImport, setShowImport] = useState(false);
   const [categorizeModalTxs, setCategorizeModalTxs] = useState<TxDoc[] | null>(null);
+  const [categorizeModalIsAll, setCategorizeModalIsAll] = useState(false);
   const [showCat3, setShowCat3] = useState(false);
   const [txFilter, setTxFilter] = useState<CategoryFilter>({});
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
@@ -204,8 +205,9 @@ export default function App() {
 
   // ── AI categorize (modal) ────────────────────────────────────────────────────
   const handleCategorizeModalDone = useCallback(
-    async (result: CategorizeResult) => {
+    async (result: CategorizeResult): Promise<number> => {
       let finalTxs = result.transactions;
+      let candidatesCreated = 0;
 
       if (result.ruleSuggestions.length > 0) {
         const candidates = result.ruleSuggestions.map(r => {
@@ -221,6 +223,7 @@ export default function App() {
         });
 
         const newRules = await batchCreateCandidates({ rules: candidates });
+        candidatesCreated = newRules.length;
 
         if (newRules.length > 0) {
           finalTxs = finalTxs.map(tx => {
@@ -240,6 +243,7 @@ export default function App() {
       }
 
       await persistCategorization(finalTxs);
+      return candidatesCreated;
     },
     [persistCategorization, batchCreateCandidates],
   );
@@ -263,6 +267,7 @@ export default function App() {
       const reset = selected.map(tx => ({
         ...tx, cat3: null, cat2: null, cat1: null, categorizationSource: null as any,
       }));
+      setCategorizeModalIsAll(false);
       setCategorizeModalTxs(reset);
     },
     [transactions],
@@ -270,7 +275,25 @@ export default function App() {
 
   // onDone for the recategorize-selected modal (force-saves, bypasses diff check)
   const handleRecategorizeModalDone = useCallback(
-    async (result: CategorizeResult) => {
+    async (result: CategorizeResult): Promise<number> => {
+      let candidatesCreated = 0;
+
+      if (result.ruleSuggestions.length > 0) {
+        const candidates = result.ruleSuggestions.map(r => {
+          const resolved = resolveCategory(r.cat3);
+          return {
+            pattern: r.pattern,
+            field: r.field,
+            matchType: r.matchType,
+            cat3: r.cat3,
+            cat2: resolved?.cat2 ?? null,
+            cat1: resolved?.cat1 ?? null,
+          };
+        });
+        const newRules = await batchCreateCandidates({ rules: candidates });
+        candidatesCreated = newRules.length;
+      }
+
       const idMap = new Map(transactions.map(tx => [tx.id, tx._convexId]));
       const updates = result.transactions
         .filter(tx => idMap.has(tx.id))
@@ -283,8 +306,9 @@ export default function App() {
           ...(tx.ruleId ? { ruleId: tx.ruleId as Id<'rules'> } : {}),
         }));
       if (updates.length > 0) await batchUpdateCategories({ updates });
+      return candidatesCreated;
     },
-    [transactions, batchUpdateCategories],
+    [transactions, batchUpdateCategories, batchCreateCandidates],
   );
 
   // ── Corrections ──────────────────────────────────────────────────────────────
@@ -494,7 +518,7 @@ export default function App() {
             Import
           </button>
           <button
-            onClick={() => transactions.length > 0 && setCategorizeModalTxs(transactions)}
+            onClick={() => { if (transactions.length > 0) { setCategorizeModalIsAll(true); setCategorizeModalTxs(transactions); } }}
             disabled={transactions.length === 0}
             style={{
               padding: '8px 16px',
@@ -655,7 +679,7 @@ export default function App() {
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {categorizeModalTxs && (
-        categorizeModalTxs === transactions ? (
+        categorizeModalIsAll ? (
           <CategorizeModal
             title="Categorize with AI"
             transactions={categorizeModalTxs}
@@ -663,6 +687,7 @@ export default function App() {
             activeRules={activeRules}
             onDone={handleCategorizeModalDone}
             onClose={() => setCategorizeModalTxs(null)}
+            onViewCandidates={() => { setCategorizeModalTxs(null); setTab('settings'); }}
           />
         ) : (
           <CategorizeModal
