@@ -6,6 +6,16 @@ export const listAll = query({
   handler: async (ctx) => ctx.db.query("transactions").collect(),
 });
 
+export const byImport = query({
+  args: { importId: v.id("imports") },
+  handler: async (ctx, { importId }) => {
+    return await ctx.db
+      .query("transactions")
+      .withIndex("by_import", q => q.eq("importId", importId))
+      .collect();
+  },
+});
+
 // Query transactions by date range
 export const byDateRange = query({
   args: {

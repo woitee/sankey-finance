@@ -186,6 +186,37 @@ function matchesRule(
   return v.includes(p);
 }
 
+/** Apply all active rules to transactions from a specific import. */
+export const applyRulesToImport = action({
+  args: { importId: v.id("imports") },
+  handler: async (ctx, { importId }): Promise<{ updated: number }> => {
+    const rules = await ctx.runQuery(api.rules.listActive, {});
+    if (rules.length === 0) return { updated: 0 };
+
+    const txs = await ctx.runQuery(api.transactions.byImport, { importId });
+    let updated = 0;
+
+    for (const tx of txs) {
+      if (tx.categorizationSource === "manual") continue;
+
+      const matched = rules.find(r => matchesRule(tx, r));
+      if (!matched) continue;
+
+      if (tx.ruleId === matched._id && tx.cat3 === matched.cat3) continue;
+
+      await ctx.runMutation(api.transactions.updateCategories, {
+        id: tx._id,
+        cat3: matched.cat3, cat2: matched.cat2, cat1: matched.cat1,
+        categorizationSource: "rule",
+        ruleId: matched._id,
+      });
+      updated++;
+    }
+
+    return { updated };
+  },
+});
+
 /** Apply all active rules to all non-manually-categorized transactions. */
 export const applyAllRules = action({
   args: {},

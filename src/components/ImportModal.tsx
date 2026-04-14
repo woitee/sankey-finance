@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useMutation } from 'convex/react';
+import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { detectParser, PARSERS } from '../parsers/registry';
 import { LlmParser } from '../parsers/llmParser';
@@ -57,6 +57,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   const upsertStatement = useMutation(api.statements.upsert);
   const batchUpsert = useMutation(api.transactions.batchUpsert);
   const ensureAccount = useMutation(api.accounts.ensureExists);
+  const applyRulesToImport = useAction(api.rules.applyRulesToImport);
 
   // ── File handling ──────────────────────────────────────────────────────────
 
@@ -133,6 +134,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         inserted += result.inserted;
         skipped += result.skipped;
       }
+
+      await applyRulesToImport({ importId });
       setPhase({ kind: 'done', inserted, skipped });
     } catch (e: any) {
       setPhase({ kind: 'error', message: String(e?.message ?? e) });
