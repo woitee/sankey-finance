@@ -259,11 +259,19 @@ export class AirBankPdfParser implements BankParser {
       const rows = groupByRow(pageItems);
       for (const row of rows) {
         // A new transaction starts when the leftmost column contains a date
+        // AND the amount column has a value — this distinguishes the first visual row
+        // of a transaction (which has the amount) from the second visual row (which
+        // has the execution date but no amount and should be treated as continuation).
         const col0Text = row
           .filter(i => i.x < (bounds[0] ?? DEFAULT_BOUNDS[0]))
           .map(i => i.str)
           .join(' ');
-        const isNewTx = /\d{1,2}\.\d{1,2}\.\d{4}/.test(col0Text);
+        const amountText = row
+          .filter(i => i.x >= (bounds[3] ?? DEFAULT_BOUNDS[3]) && i.x < (bounds[4] ?? DEFAULT_BOUNDS[4]))
+          .map(i => i.str)
+          .join(' ');
+        const isNewTx = /\d{1,2}\.\d{1,2}\.\d{4}/.test(col0Text) &&
+          (!current || /[0-9]/.test(amountText));
 
         if (isNewTx) {
           if (current) {
