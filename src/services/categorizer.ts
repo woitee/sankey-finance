@@ -1,7 +1,5 @@
 import type { Transaction } from '../types/transaction';
-import type { CorrectionsDB } from '../types/category';
 import { resolveCategory, getAllCat3Values } from '../config/categories';
-import { findCorrection } from './corrections';
 import { createLLMProvider } from './llm';
 import type { CategorizationRequest, RuleSuggestion } from './llm';
 
@@ -31,21 +29,19 @@ export function matchesRule(tx: Transaction, rule: ActiveRule): boolean {
 
 export async function categorizeTransactions(
   transactions: Transaction[],
-  correctionsDB: CorrectionsDB,
   options: { useLLM?: boolean; activeRules?: ActiveRule[] } = {},
 ): Promise<CategorizationResult> {
   const { useLLM = true, activeRules = [] } = options;
   const result = [...transactions];
   const needsLLM: { index: number; request: CategorizationRequest }[] = [];
 
-  // Step 1: Apply rules, then corrections, then auto-categorize income
   for (let i = 0; i < result.length; i++) {
     const tx = { ...result[i] };
     result[i] = tx;
 
     if (tx.cat3) continue;
 
-    // Active rules first
+    // Active rules
     const matchedRule = activeRules.find(r => matchesRule(tx, r));
     if (matchedRule) {
       applyCategories(tx, matchedRule.cat3, 'rule', matchedRule.cat2 ?? undefined, matchedRule.cat1 ?? undefined);
@@ -65,13 +61,6 @@ export async function categorizeTransactions(
       }
     }
 
-    // Legacy corrections DB
-    const correction = findCorrection(tx.merchantName, tx.details, correctionsDB.corrections);
-    if (correction) {
-      applyCategories(tx, correction.cat3, 'rule', correction.cat2, correction.cat1);
-      continue;
-    }
-
     // Queue for LLM
     if (useLLM && tx.amount < 0) {
       needsLLM.push({
@@ -86,7 +75,7 @@ export async function categorizeTransactions(
     }
   }
 
-  // Step 2: LLM batch categorization
+  // LLM batch categorization
   let ruleSuggestions: RuleSuggestion[] = [];
 
   if (needsLLM.length > 0 && useLLM) {
@@ -103,7 +92,7 @@ export async function categorizeTransactions(
         const response = llmResult.responses[j];
         const tx = { ...result[index] };
         result[index] = tx;
-        applyCategories(tx, response.cat3, 'llm');
+        applyCategories(tx, response.cat3, 'llm', response.cat2, response.cat1);
       }
 
       ruleSuggestions = llmResult.ruleSuggestions;
@@ -123,8 +112,15 @@ function applyCategories(
   cat1Override?: string | null,
 ) {
   tx.cat3 = cat3;
-  const resolved = resolveCategory(cat3);
-  tx.cat2 = cat2Override ?? resolved?.cat2 ?? 'Other';
-  tx.cat1 = cat1Override ?? resolved?.cat1 ?? 'WANT';
+  if (source === 'llm') {
+    tx.cat2 = cat2Override ?? 'Other';
+    tx.cat1 = cat1Override ?? 'WANT';
+  } else {
+    const resolved = resolveCategory(cat3);
+    tx.cat2 = cat2Override ?? resolved?.cat2 ?? 'Other';
+    tx.cat1 = cat1Override ?? resolved?.cat1 ?? 'WANT';
+  }
+  // NOISE is manual-only — never assign it through automated flows
+  if (source !== 'manual' && tx.cat1 === 'NOISE') tx.cat1 = 'WANT';
   tx.categorizationSource = source;
 }

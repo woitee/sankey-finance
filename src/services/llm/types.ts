@@ -6,6 +6,8 @@ export interface CategorizationRequest {
 }
 
 export interface CategorizationResponse {
+  cat1: string;
+  cat2: string;
   cat3: string;
   confidence: number;
 }
@@ -14,6 +16,8 @@ export interface RuleSuggestion {
   pattern: string;
   field: 'merchantName' | 'details';
   matchType: 'contains' | 'exact' | 'startsWith';
+  cat1: string;
+  cat2: string;
   cat3: string;
 }
 

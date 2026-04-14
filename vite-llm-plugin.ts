@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Plugin } from 'vite';
 import type { LanguageModel } from 'ai';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { getAllCat2Values } from './src/config/categories';
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5',
@@ -28,18 +29,25 @@ function createModel(env: Record<string, string>): LanguageModel {
   }
 }
 
-const responseSchema = z.object({
-  categories: z.array(z.object({
-    index: z.number(),
-    cat3: z.string(),
-  })),
-  rules: z.array(z.object({
-    pattern: z.string(),
-    field: z.enum(['merchantName', 'details']),
-    matchType: z.enum(['contains', 'exact', 'startsWith']),
-    cat3: z.string(),
-  })),
-});
+function buildResponseSchema(validCat2Values: [string, ...string[]]) {
+  const cat2Enum = z.enum(validCat2Values);
+  return z.object({
+    categories: z.array(z.object({
+      index: z.number(),
+      cat1: z.enum(['MUST', 'WANT', 'INCOME']),
+      cat2: cat2Enum,
+      cat3: z.string(),
+    })),
+    rules: z.array(z.object({
+      pattern: z.string(),
+      field: z.enum(['merchantName', 'details']),
+      matchType: z.enum(['contains', 'exact', 'startsWith']),
+      cat1: z.enum(['MUST', 'WANT', 'INCOME']),
+      cat2: cat2Enum,
+      cat3: z.string(),
+    })),
+  });
+}
 
 interface CategorizationRequest {
   merchantName: string;
@@ -53,6 +61,9 @@ async function categorizeBatch(
   batch: CategorizationRequest[],
   validCat3Values: string[],
 ) {
+  const validCat2Values = getAllCat2Values() as [string, ...string[]];
+  const responseSchema = buildResponseSchema(validCat2Values);
+
   const transactionList = batch
     .map(
       (r, i) =>
@@ -63,7 +74,16 @@ async function categorizeBatch(
   const { object } = await generateObject({
     model,
     schema: responseSchema,
-    system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign the best-matching cat3 category from the provided list.
+    system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign cat1, cat2, and cat3 for every transaction.
+
+cat1 rules (no exceptions):
+- Negative amounts (money leaving) → MUST or WANT
+- Positive amounts (money arriving) → INCOME
+- MUST = non-negotiable recurring expenses (rent, groceries, utilities, health, transport essentials, child essentials, pet essentials)
+- WANT = discretionary spending (restaurants, entertainment, clothes, subscriptions, gadgets, etc.)
+
+cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(', ')}.
+Do NOT invent new cat2 values. If unsure, use "Other".
 
 Category reference (examples of what belongs where):
 - groceries: supermarkets — Billa, Albert, Kaufland, Lidl, Tesco, Penny, Globus, Coop, Hruška
@@ -119,7 +139,12 @@ ${transactionList}`,
     const entry = object.categories.find(p => p.index === i + 1);
     const cat3 = entry?.cat3 ?? 'uncategorized';
     const isValid = validCat3Values.includes(cat3);
-    return { cat3: isValid ? cat3 : 'uncategorized', confidence: isValid ? 0.8 : 0 };
+    return {
+      cat1: entry?.cat1 ?? 'WANT',
+      cat2: entry?.cat2 ?? 'Other',
+      cat3: isValid ? cat3 : 'uncategorized',
+      confidence: isValid ? 0.8 : 0,
+    };
   });
 
   const ruleSuggestions = (object.rules ?? [])

@@ -41,7 +41,6 @@ export default defineSchema({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
-      v.literal("correction"),  // legacy — kept for existing docs
       v.literal("llm"),
       v.literal("manual"),
       v.null()
@@ -100,15 +99,6 @@ export default defineSchema({
   })
     .index("by_status", ["status"])
     .index("by_pattern", ["pattern"]),
-
-  corrections: defineTable({
-    merchantPattern: v.string(),
-    cat3: v.string(),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
-    note: v.union(v.string(), v.null()),
-    createdAt: v.string(),
-  }).index("by_merchantPattern", ["merchantPattern"]),
 
   integrations: defineTable({
     bank: v.string(),               // e.g. "fio", "revolut"

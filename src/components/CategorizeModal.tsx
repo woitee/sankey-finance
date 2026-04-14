@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Transaction } from '../types/transaction';
-import type { CorrectionsDB } from '../types/category';
 import type { ActiveRule } from '../services/categorizer';
 import { categorizeTransactions, matchesRule } from '../services/categorizer';
 import { createLLMProvider } from '../services/llm';
 import type { RuleSuggestion } from '../services/llm';
-import { getAllCat3Values, resolveCategory } from '../config/categories';
-import { findCorrection } from '../services/corrections';
+import { getAllCat3Values } from '../config/categories';
 
 // Inject keyframe animations once
 const STYLE_ID = 'categorize-modal-styles';
@@ -57,7 +55,6 @@ export interface CategorizeResult {
 interface Props {
   title?: string;
   transactions: Transaction[];   // already reset if recategorizing
-  correctionsDB: CorrectionsDB;
   activeRules: ActiveRule[];
   onDone: (result: CategorizeResult) => Promise<number>; // returns count of newly created candidates
   onClose: () => void;
@@ -88,7 +85,6 @@ const btn = (bg: string, color: string, disabled?: boolean): React.CSSProperties
 
 function computeDryRunCounts(
   transactions: Transaction[],
-  correctionsDB: CorrectionsDB,
   activeRules: ActiveRule[],
 ): DryRunCounts {
   let alreadyCategorized = 0;
@@ -104,11 +100,6 @@ function computeDryRunCounts(
 
     // Auto-categorize income
     if (tx.amount > 0 && (tx.type === 'prichozi_uhrada' || tx.type === 'odmena_unity' || tx.type === 'vraceni_penez')) {
-      byRule++; continue;
-    }
-
-    // Corrections DB
-    if (findCorrection(tx.merchantName, tx.details, correctionsDB.corrections)) {
       byRule++; continue;
     }
 
@@ -129,13 +120,12 @@ function fmtMs(ms: number): string {
 export function CategorizeModal({
   title = 'Categorize with AI',
   transactions,
-  correctionsDB,
   activeRules,
   onDone,
   onClose,
   onViewCandidates,
 }: Props) {
-  const counts = computeDryRunCounts(transactions, correctionsDB, activeRules);
+  const counts = computeDryRunCounts(transactions, activeRules);
   const [phase, setPhase] = useState<Phase>({ kind: 'preview', counts });
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -160,9 +150,9 @@ export function CategorizeModal({
     setPhase({ kind: 'running', batches: [...initial] });
 
     if (batchCount === 0) {
-      // Nothing for LLM — just run rule/correction pass and return
+      // Nothing for LLM — just run rules pass and return
       try {
-        const result = await categorizeTransactions(transactions, correctionsDB, { useLLM: false, activeRules });
+        const result = await categorizeTransactions(transactions, { useLLM: false, activeRules });
         setPhase({ kind: 'saving' });
         await onDone({ transactions: result.transactions, ruleSuggestions: [] });
         setPhase({ kind: 'done', categorized: counts.byRule, ruleCount: 0 });
@@ -173,8 +163,8 @@ export function CategorizeModal({
     }
 
     try {
-      // Step 1: apply rules / corrections (no LLM)
-      const withRules = await categorizeTransactions(transactions, correctionsDB, { useLLM: false, activeRules });
+      // Step 1: apply rules (no LLM)
+      const withRules = await categorizeTransactions(transactions, { useLLM: false, activeRules });
       const finalTxs = [...withRules.transactions];
 
       // Step 2: collect LLM queue (still uncategorized, negative amounts)
@@ -229,13 +219,12 @@ export function CategorizeModal({
 
         // Apply results
         batchSlice.forEach(({ i }, j) => {
-          const cat3 = batchResult.responses[j].cat3;
-          const resolved = resolveCategory(cat3);
+          const { cat1, cat2, cat3 } = batchResult.responses[j];
           finalTxs[i] = {
             ...finalTxs[i],
             cat3,
-            cat2: resolved?.cat2 ?? 'Other',
-            cat1: resolved?.cat1 ?? 'WANT',
+            cat2: cat2 ?? 'Other',
+            cat1: cat1 ?? 'WANT',
             categorizationSource: 'llm',
           };
         });
@@ -282,7 +271,7 @@ export function CategorizeModal({
               <span style={{ color: '#64748b' }}>Already categorized</span>
               <span style={{ color: '#cdd6f4', fontWeight: 600, textAlign: 'right' }}>{counts.alreadyCategorized}</span>
 
-              <span style={{ color: '#64748b' }}>Handled by rules / corrections</span>
+              <span style={{ color: '#64748b' }}>Handled by rules</span>
               <span style={{ color: '#a6e3a1', fontWeight: 600, textAlign: 'right' }}>{counts.byRule}</span>
 
               <span style={{ color: '#64748b' }}>Sent to LLM</span>

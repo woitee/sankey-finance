@@ -18,7 +18,7 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 - **Auto-categorize** — active rules run first, then LLM (server-side via Vite plugin) for anything remaining
 - **3-tier categories** — `cat1` (MUST / WANT / INCOME) → `cat2` (Food, Transport…) → `cat3` (groceries, fuel…)
 - **Categorization rules** — pattern matching on merchant name or details; candidate rules from AI require approval
-- **Manual overrides** — click any cell in the transaction table to correct a category; stored as corrections
+- **Manual overrides** — click any cell in the transaction table to edit a category directly
 - **Sankey chart** — Income → MUST/WANT → subcategories → Savings/Deficit
 - **Transaction grouping** — select multiple transactions and merge them into a labeled group
 - **Multi-account** — multiple bank accounts, filterable in the UI
@@ -86,7 +86,7 @@ Rules live in Settings → Active Rules. Each rule matches a **pattern** against
 
 - **Active rules** apply automatically on import and via "Rerun all rules"
 - **Candidate rules** are AI suggestions awaiting approval; they apply immediately to new transactions but revert to `llm` source if rejected or deleted
-- Manual corrections (`source = manual`) are never overridden by rules
+- Manual edits (`source = manual`) are never overridden by rules
 
 ## Project structure
 
@@ -94,7 +94,7 @@ Rules live in Settings → Active Rules. Each rule matches a **pattern** against
 src/
   components/       # React UI (SettingsView, TransactionTable, charts…)
   config/           # Category hierarchy
-  services/         # Categorizer, LLM provider, corrections DB
+  services/         # Categorizer, LLM provider
   transforms/       # Sankey builder, summary, grouping
   types/
 convex/             # Backend: schema, queries, mutations, actions

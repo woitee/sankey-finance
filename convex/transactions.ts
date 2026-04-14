@@ -89,7 +89,6 @@ export const upsert = mutation({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
-      v.literal("correction"),
       v.literal("llm"),
       v.literal("manual"),
       v.null()
@@ -122,7 +121,6 @@ export const updateCategories = mutation({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
-      v.literal("correction"),
       v.literal("llm"),
       v.literal("manual"),
       v.null()
@@ -200,7 +198,6 @@ export const batchUpdateCategories = mutation({
         cat1: v.union(v.string(), v.null()),
         categorizationSource: v.union(
           v.literal("rule"),
-          v.literal("correction"),
           v.literal("llm"),
           v.literal("manual"),
           v.null()
@@ -226,18 +223,3 @@ export const batchDelete = mutation({
   },
 });
 
-/** One-shot migration: rename legacy "correction" source to "llm". */
-export const migrateCorrectionToLlm = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const txs = await ctx.db.query("transactions").collect();
-    let updated = 0;
-    for (const tx of txs) {
-      if (tx.categorizationSource === "correction") {
-        await ctx.db.patch(tx._id, { categorizationSource: "llm" });
-        updated++;
-      }
-    }
-    return { updated };
-  },
-});

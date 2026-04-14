@@ -14,7 +14,6 @@ import type * as bankSync from "../bankSync.js";
 import type * as banks_registry from "../banks/registry.js";
 import type * as banks_types from "../banks/types.js";
 import type * as cardholderNicknames from "../cardholderNicknames.js";
-import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
@@ -38,7 +37,6 @@ declare const fullApi: ApiFromModules<{
   "banks/registry": typeof banks_registry;
   "banks/types": typeof banks_types;
   cardholderNicknames: typeof cardholderNicknames;
-  corrections: typeof corrections;
   crons: typeof crons;
   http: typeof http;
   imports: typeof imports;

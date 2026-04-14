@@ -81,34 +81,9 @@ async function migrateStatements() {
   }
 }
 
-async function migrateCorrections() {
-  const correctionsPath = path.join(process.cwd(), "data", "corrections.json");
-  if (!fs.existsSync(correctionsPath)) {
-    console.log("No corrections.json found, skipping.");
-    return;
-  }
-
-  const raw = fs.readFileSync(correctionsPath, "utf-8");
-  const db = JSON.parse(raw);
-  const corrections = db.corrections ?? [];
-
-  const normalized = corrections.map((c: any) => ({
-    merchantPattern: c.merchantPattern,
-    cat3: c.cat3,
-    cat2: c.cat2 ?? null,
-    cat1: c.cat1 ?? null,
-    note: c.note ?? null,
-    createdAt: c.createdAt,
-  }));
-
-  await client.mutation(api.corrections.bulkImport, { corrections: normalized });
-  console.log(`Corrections: ${normalized.length} entries imported.`);
-}
-
 async function main() {
   console.log("Starting migration to Convex...\n");
   await migrateStatements();
-  await migrateCorrections();
   console.log("\nDone.");
 }
 

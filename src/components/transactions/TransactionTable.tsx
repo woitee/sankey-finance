@@ -13,7 +13,7 @@ export type CategoryFilter = {
   cat3?: string;
 };
 
-export type CorrectionPayload = {
+export type CategoryEditPayload = {
   txId: string;
   merchantName: string;
   cat3: string;
@@ -69,7 +69,7 @@ export function TransactionTable({
   categorizing = false,
 }: {
   transactions: Transaction[];
-  onCorrect: (payload: CorrectionPayload) => void;
+  onCorrect: (payload: CategoryEditPayload) => void;
   initialFilter?: CategoryFilter;
   onGroup: (txIds: string[], label?: string) => void;
   onUngroup: (groupId: string) => void;
@@ -314,9 +314,7 @@ export function TransactionTable({
             <span style={{ color: '#64748b', fontStyle: 'italic' }}>deleted rule</span>
           ) : (
             <span style={{ color: '#64748b' }}>
-              {tx.categorizationSource === null ? '—'
-                : tx.categorizationSource === 'correction' ? 'llm'
-                : tx.categorizationSource}
+              {tx.categorizationSource ?? '—'}
             </span>
           )}
         </td>

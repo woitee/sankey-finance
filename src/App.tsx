@@ -3,17 +3,14 @@ import { useQuery, useMutation } from 'convex/react';
 import type { Id } from '../convex/_generated/dataModel';
 import { api } from '../convex/_generated/api';
 import type { Transaction } from './types/transaction';
-import type { CorrectionsDB } from './types/category';
 import { categorizeTransactions, matchesRule } from './services/categorizer';
 import type { ActiveRule } from './services/categorizer';
-import { normalizeMerchant, addCorrectionLocally } from './services/corrections';
-import { resolveCategory } from './config/categories';
 import { buildSankeyData } from './transforms/sankey';
 import { computeSummary } from './transforms/summary';
 import { SankeyChart } from './components/charts/SankeyChart';
 import { SummaryCards } from './components/charts/SummaryCards';
 import { CategoryBreakdown } from './components/charts/CategoryBreakdown';
-import { TransactionTable, type CategoryFilter, type CorrectionPayload } from './components/transactions/TransactionTable';
+import { TransactionTable, type CategoryFilter, type CategoryEditPayload } from './components/transactions/TransactionTable';
 import { DateRangePicker } from './components/DateRangePicker';
 import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
@@ -64,7 +61,6 @@ export default function App() {
     api.transactions.byDateRange,
     from && to ? { from, to } : 'skip',
   );
-  const convexCorrections = useQuery(api.corrections.list);
   const convexAccounts = useQuery(api.accounts.list);
   const convexActiveRules = useQuery(api.rules.listActive);
   const convexNicknames = useQuery(api.cardholderNicknames.list);
@@ -72,7 +68,6 @@ export default function App() {
   // ── Convex mutations ────────────────────────────────────────────────────────
   const batchUpdateCategories = useMutation(api.transactions.batchUpdateCategories);
   const updateGroupMutation = useMutation(api.transactions.updateGroup);
-  const upsertCorrection = useMutation(api.corrections.upsert);
   const batchCreateCandidates = useMutation(api.rules.batchCreateCandidates);
   const batchDeleteMutation = useMutation(api.transactions.batchDelete);
 
@@ -119,21 +114,6 @@ export default function App() {
     [allTransactions, selectedAccount],
   );
 
-  const correctionsDB: CorrectionsDB = useMemo(
-    () => ({
-      version: 1,
-      corrections: (convexCorrections ?? []).map(c => ({
-        merchantPattern: c.merchantPattern,
-        cat3: c.cat3,
-        cat2: c.cat2 ?? undefined,
-        cat1: c.cat1 ?? undefined,
-        note: c.note ?? undefined,
-        createdAt: c.createdAt,
-      })),
-    }),
-    [convexCorrections],
-  );
-
   const activeRules: ActiveRule[] = useMemo(
     () =>
       (convexActiveRules ?? []).map(r => ({
@@ -148,10 +128,8 @@ export default function App() {
     [convexActiveRules],
   );
 
-  // Only block the whole UI on the very first load (corrections + initial tx fetch)
-  const initialLoading = convexCorrections === undefined;
   const txLoading = convexTxs === undefined;
-  const loading = initialLoading;
+  const loading = txLoading;
 
   // ── Persist categorization changes back to Convex ───────────────────────────
   const persistCategorization = useCallback(
@@ -187,7 +165,7 @@ export default function App() {
     [transactions, batchUpdateCategories],
   );
 
-  // ── Auto-categorize (corrections only) when date range loads ────────────────
+  // ── Auto-categorize (rules only) when date range loads ──────────────────────
   useEffect(() => {
     if (txLoading || transactions.length === 0) return;
     const rangeKey = `${from}::${to}`;
@@ -198,10 +176,10 @@ export default function App() {
       return;
     }
     autoCategorizedRef.current.add(rangeKey);
-    categorizeTransactions(transactions, correctionsDB, { useLLM: false, activeRules }).then(
+    categorizeTransactions(transactions, { useLLM: false, activeRules }).then(
       result => persistCategorization(result.transactions),
     );
-  }, [loading, transactions, correctionsDB, from, to, persistCategorization]);
+  }, [txLoading, transactions, activeRules, from, to, persistCategorization]);
 
   // ── AI categorize (modal) ────────────────────────────────────────────────────
   const handleCategorizeModalDone = useCallback(
@@ -210,17 +188,14 @@ export default function App() {
       let candidatesCreated = 0;
 
       if (result.ruleSuggestions.length > 0) {
-        const candidates = result.ruleSuggestions.map(r => {
-          const resolved = resolveCategory(r.cat3);
-          return {
-            pattern: r.pattern,
-            field: r.field,
-            matchType: r.matchType,
-            cat3: r.cat3,
-            cat2: resolved?.cat2 ?? null,
-            cat1: resolved?.cat1 ?? null,
-          };
-        });
+        const candidates = result.ruleSuggestions.map(r => ({
+          pattern: r.pattern,
+          field: r.field,
+          matchType: r.matchType,
+          cat3: r.cat3,
+          cat2: r.cat2 ?? null,
+          cat1: r.cat1 ?? null,
+        }));
 
         const newRules = await batchCreateCandidates({ rules: candidates });
         candidatesCreated = newRules.length;
@@ -279,17 +254,14 @@ export default function App() {
       let candidatesCreated = 0;
 
       if (result.ruleSuggestions.length > 0) {
-        const candidates = result.ruleSuggestions.map(r => {
-          const resolved = resolveCategory(r.cat3);
-          return {
-            pattern: r.pattern,
-            field: r.field,
-            matchType: r.matchType,
-            cat3: r.cat3,
-            cat2: resolved?.cat2 ?? null,
-            cat1: resolved?.cat1 ?? null,
-          };
-        });
+        const candidates = result.ruleSuggestions.map(r => ({
+          pattern: r.pattern,
+          field: r.field,
+          matchType: r.matchType,
+          cat3: r.cat3,
+          cat2: r.cat2 ?? null,
+          cat1: r.cat1 ?? null,
+        }));
         const newRules = await batchCreateCandidates({ rules: candidates });
         candidatesCreated = newRules.length;
       }
@@ -311,50 +283,24 @@ export default function App() {
     [transactions, batchUpdateCategories, batchCreateCandidates],
   );
 
-  // ── Corrections ──────────────────────────────────────────────────────────────
+  // ── Manual category edit ─────────────────────────────────────────────────────
   const handleCorrect = useCallback(
-    async (payload: CorrectionPayload) => {
-      const normalized = normalizeMerchant(payload.merchantName);
-
-      // Save correction to Convex
-      await upsertCorrection({
-        merchantPattern: normalized,
-        cat3: payload.cat3,
-        cat2: payload.cat2 ?? null,
-        cat1: payload.cat1 ?? null,
-        note: null,
-        createdAt: new Date().toISOString(),
-      });
-
-      // Directly apply to the target transaction
+    async (payload: CategoryEditPayload) => {
       const target = transactions.find(tx => tx.id === payload.txId);
-      if (target) {
-        await batchUpdateCategories({
-          updates: [
-            {
-              id: target._convexId,
-              cat3: payload.cat3 || target.cat3,
-              cat2: payload.cat2 ?? target.cat2,
-              cat1: payload.cat1 ?? target.cat1,
-              categorizationSource: 'manual',
-            },
-          ],
-        });
-      }
-
-      // Re-apply corrections to remaining uncategorized transactions
-      const updatedDB = addCorrectionLocally(correctionsDB, payload.merchantName, {
-        cat3: payload.cat3,
-        cat2: payload.cat2,
-        cat1: payload.cat1,
+      if (!target) return;
+      await batchUpdateCategories({
+        updates: [
+          {
+            id: target._convexId,
+            cat3: payload.cat3 || target.cat3,
+            cat2: payload.cat2 ?? target.cat2,
+            cat1: payload.cat1 ?? target.cat1,
+            categorizationSource: 'manual',
+          },
+        ],
       });
-      const recategorized = await categorizeTransactions(transactions, updatedDB, {
-        useLLM: false,
-        activeRules,
-      });
-      await persistCategorization(recategorized.transactions);
     },
-    [transactions, correctionsDB, upsertCorrection, batchUpdateCategories, persistCategorization],
+    [transactions, batchUpdateCategories],
   );
 
   // ── Grouping ─────────────────────────────────────────────────────────────────
@@ -683,7 +629,6 @@ export default function App() {
           <CategorizeModal
             title="Categorize with AI"
             transactions={categorizeModalTxs}
-            correctionsDB={correctionsDB}
             activeRules={activeRules}
             onDone={handleCategorizeModalDone}
             onClose={() => setCategorizeModalTxs(null)}
@@ -693,7 +638,6 @@ export default function App() {
           <CategorizeModal
             title={`Recategorize ${categorizeModalTxs.length} transaction${categorizeModalTxs.length !== 1 ? 's' : ''}`}
             transactions={categorizeModalTxs}
-            correctionsDB={correctionsDB}
             activeRules={activeRules}
             onDone={handleRecategorizeModalDone}
             onClose={() => setCategorizeModalTxs(null)}
