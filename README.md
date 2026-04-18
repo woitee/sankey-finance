@@ -36,11 +36,12 @@ cp .env.example .env
 # TOKEN_ENCRYPTION_KEY must be set as a Convex server env var:
 npx convex env set TOKEN_ENCRYPTION_KEY $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
-# Start Convex dev server (separate terminal)
-npx convex dev
+# Start everything (Convex + frontend)
+npm start            # http://localhost:5173
 
-# Start frontend
-npm run dev          # http://localhost:5173
+# Or start them separately
+npx convex dev
+npm run dev
 ```
 
 Environment variables used by the app:
