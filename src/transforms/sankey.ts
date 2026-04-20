@@ -70,7 +70,7 @@ export function buildSankeyData(
   const cat1Totals: Record<string, number> = {};
   const cat2Groups: Record<string, Record<string, number>> = {};
   const cat3Groups: Record<string, Record<string, number>> = {};
-  // Track how much of each (splitC1→c2) and (c2→c3) link came from MUST_WANT transactions
+  // Track how much of each (splitC1→c2) and (c2→c3) link came from MUST/WANT transactions
   const mustWantCat2: Record<string, Record<string, number>> = {};
   const mustWantCat3: Record<string, Record<string, number>> = {};
 
@@ -79,7 +79,7 @@ export function buildSankeyData(
     const c1 = t.cat1!;
     const c2 = t.cat2!;
     const c3 = t.cat3!;
-    const isMustWant = c1 === 'MUST_WANT';
+    const isMustWant = c1 === 'MUST/WANT';
 
     const splits: Array<[string, number]> = isMustWant
       ? [['MUST', abs / 2], ['WANT', abs / 2]]

@@ -89,6 +89,7 @@ export const upsert = mutation({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
+      v.literal("unverified_rule"),
       v.literal("llm"),
       v.literal("manual"),
       v.null()
@@ -121,6 +122,7 @@ export const updateCategories = mutation({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
+      v.literal("unverified_rule"),
       v.literal("llm"),
       v.literal("manual"),
       v.null()
@@ -198,6 +200,7 @@ export const batchUpdateCategories = mutation({
         cat1: v.union(v.string(), v.null()),
         categorizationSource: v.union(
           v.literal("rule"),
+          v.literal("unverified_rule"),
           v.literal("llm"),
           v.literal("manual"),
           v.null()

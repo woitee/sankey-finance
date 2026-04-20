@@ -285,7 +285,7 @@ function RuleDescription({ rule }: { rule: any }) {
   );
 }
 
-const CAT1_VALUES = ['MUST', 'WANT', 'MUST_WANT', 'INCOME', 'NOISE', 'TRANSFER'];
+const CAT1_VALUES = ['MUST', 'WANT', 'MUST/WANT', 'INCOME', 'NOISE', 'TRANSFER'];
 
 interface RuleFormValues {
   pattern: string;
@@ -413,7 +413,7 @@ function CandidateRules() {
           onCancel={() => setEditing(null)}
         />
       ) : (
-        <div key={rule._id} style={{
+        <div key={rule._id} id={`rule-${rule._id}`} style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '10px 14px', borderRadius: 8, background: '#1e1e2e',
           border: '1px solid #f9e2af22',
@@ -487,7 +487,7 @@ function ActiveRules() {
       )}
       {(() => {
         // Group by cat1+cat2, preserving a stable order
-        const CAT1_ORDER = ['MUST', 'WANT', 'MUST_WANT', 'INCOME', 'NOISE', 'TRANSFER'];
+        const CAT1_ORDER = ['MUST', 'WANT', 'MUST/WANT', 'INCOME', 'NOISE', 'TRANSFER'];
         const groups = new Map<string, typeof rules>();
         for (const rule of rules) {
           const key = `${rule.cat1 ?? '?'} / ${rule.cat2 ?? '?'}`;

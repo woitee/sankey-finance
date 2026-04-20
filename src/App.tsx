@@ -63,6 +63,7 @@ export default function App() {
   );
   const convexAccounts = useQuery(api.accounts.list);
   const convexActiveRules = useQuery(api.rules.listActive);
+  const convexCandidateRules = useQuery(api.rules.listCandidates);
   const convexNicknames = useQuery(api.cardholderNicknames.list);
 
   // ── Convex mutations ────────────────────────────────────────────────────────
@@ -126,6 +127,20 @@ export default function App() {
         cat1: r.cat1,
       })),
     [convexActiveRules],
+  );
+
+  const candidateRules: ActiveRule[] = useMemo(
+    () =>
+      (convexCandidateRules ?? []).map(r => ({
+        id: r._id,
+        pattern: r.pattern,
+        field: r.field,
+        matchType: r.matchType,
+        cat3: r.cat3,
+        cat2: r.cat2,
+        cat1: r.cat1,
+      })),
+    [convexCandidateRules],
   );
 
   const txLoading = convexTxs === undefined;
@@ -209,7 +224,7 @@ export default function App() {
               cat3: matched.cat3,
               cat2: matched.cat2,
               cat1: matched.cat1,
-              categorizationSource: 'rule' as const,
+              categorizationSource: 'unverified_rule' as const,
               ruleId: matched._id as string,
             };
           });
@@ -252,6 +267,8 @@ export default function App() {
     async (result: CategorizeResult): Promise<number> => {
       let candidatesCreated = 0;
 
+      let finalTxs = result.transactions;
+
       if (result.ruleSuggestions.length > 0) {
         const candidates = result.ruleSuggestions.map(r => ({
           pattern: r.pattern,
@@ -263,10 +280,26 @@ export default function App() {
         }));
         const newRules = await batchCreateCandidates({ rules: candidates });
         candidatesCreated = newRules.length;
+
+        if (newRules.length > 0) {
+          finalTxs = finalTxs.map(tx => {
+            if (tx.categorizationSource !== 'llm') return tx;
+            const matched = newRules.find(r => matchesRule(tx, r as ActiveRule));
+            if (!matched) return tx;
+            return {
+              ...tx,
+              cat3: matched.cat3,
+              cat2: matched.cat2,
+              cat1: matched.cat1,
+              categorizationSource: 'unverified_rule' as const,
+              ruleId: matched._id as string,
+            };
+          });
+        }
       }
 
       const idMap = new Map(transactions.map(tx => [tx.id, tx._convexId]));
-      const updates = result.transactions
+      const updates = finalTxs
         .filter(tx => idMap.has(tx.id))
         .map(tx => ({
           id: idMap.get(tx.id)!,
@@ -580,6 +613,7 @@ export default function App() {
               onUngroup={handleUngroup}
               onUpdateGroupLabel={handleUpdateGroupLabel}
               activeRules={activeRules}
+              candidateRules={candidateRules}
               onDelete={handleDeleteSelected}
               onRecategorizeWithAI={handleRecategorizeSelected}
               categorizing={categorizeModalTxs !== null}

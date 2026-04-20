@@ -21,7 +21,7 @@ export interface Transaction {
   cat3: string | null;
   cat2: string | null;
   cat1: string | null;
-  categorizationSource: 'rule' | 'llm' | 'manual' | null;
+  categorizationSource: 'rule' | 'unverified_rule' | 'llm' | 'manual' | null;
   ruleId?: string | null;
   groupId: string | null;
   groupLabel: string | null;

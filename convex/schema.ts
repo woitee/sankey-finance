@@ -41,6 +41,7 @@ export default defineSchema({
     cat1: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
+      v.literal("unverified_rule"),
       v.literal("llm"),
       v.literal("manual"),
       v.null()

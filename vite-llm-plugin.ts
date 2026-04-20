@@ -34,7 +34,7 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
   return z.object({
     categories: z.array(z.object({
       index: z.number(),
-      cat1: z.enum(['MUST', 'WANT', 'MUST_WANT', 'INCOME']),
+      cat1: z.enum(['MUST', 'WANT', 'MUST/WANT', 'INCOME']),
       cat2: cat2Enum,
       cat3: z.string(),
     })),
@@ -42,7 +42,7 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
       pattern: z.string(),
       field: z.enum(['merchantName', 'details']),
       matchType: z.enum(['contains', 'exact', 'startsWith']),
-      cat1: z.enum(['MUST', 'WANT', 'MUST_WANT', 'INCOME']),
+      cat1: z.enum(['MUST', 'WANT', 'MUST/WANT', 'INCOME']),
       cat2: cat2Enum,
       cat3: z.string(),
     })),
@@ -77,11 +77,11 @@ async function categorizeBatch(
     system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign cat1, cat2, and cat3 for every transaction.
 
 cat1 rules (no exceptions):
-- Negative amounts (money leaving) → MUST, WANT, or MUST_WANT
+- Negative amounts (money leaving) → MUST, WANT, or MUST/WANT
 - Positive amounts (money arriving) → INCOME
 - MUST = non-negotiable recurring expenses (rent, groceries, utilities, health, transport essentials, child essentials, pet essentials)
 - WANT = discretionary spending (restaurants, entertainment, clothes, subscriptions, gadgets, etc.)
-- MUST_WANT = ambiguous expenses that are partially necessary and partially discretionary (e.g. a pharmacy purchase that includes both medicine and cosmetics); split 50/50 between MUST and WANT in reporting
+- MUST/WANT = expenses that are partially necessary and partially discretionary; split 50/50 between MUST and WANT in reporting. Primary use case: restaurant meals and takeout/delivery (eating is necessary, but choosing a restaurant is discretionary). Also applies to other mixed-necessity purchases where the same transaction covers both a need and a want.
 
 cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(', ')}.
 Do NOT invent new cat2 values. If unsure, use "Other".
@@ -124,7 +124,8 @@ Category reference (examples of what belongs where):
 - reimbursement: company expense reimbursements, employer refunds
 - uncategorized: only if truly cannot determine — do not default to this
 
-Suggest reusable rules only for patterns with high confidence (e.g. merchant name substring). Omit rules for one-off or ambiguous transactions.`,
+Suggest reusable rules for recurring merchants you recognize with high confidence.
+Rule structure: "pattern" must be the SHORTEST string that uniquely identifies the brand — just the brand name, nothing else. Strip location suffixes, store codes, and transaction noise. Examples: "IKEA" not "IKEA ZLICIN OD ECO", "McDonald" not "McDonald's Praha 5", "Netflix" not "NETFLIX.COM". "matchType" says how: contains/exact/startsWith. Example: { pattern: "IKEA", field: "merchantName", matchType: "contains", ... }. Omit rules for one-off or ambiguous transactions.`,
     messages: [
       {
         role: 'user',
@@ -148,8 +149,9 @@ ${transactionList}`,
     };
   });
 
+  const MATCH_TYPE_KEYWORDS = new Set(['contains', 'exact', 'startsWith']);
   const ruleSuggestions = (object.rules ?? [])
-    .filter(r => r.pattern.trim() && validCat3Values.includes(r.cat3))
+    .filter(r => r.pattern.trim() && validCat3Values.includes(r.cat3) && !MATCH_TYPE_KEYWORDS.has(r.pattern.trim()))
     .map(r => ({ ...r, pattern: r.pattern.trim() }));
 
   return { responses, ruleSuggestions };
