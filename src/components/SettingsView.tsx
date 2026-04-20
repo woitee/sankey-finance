@@ -317,8 +317,6 @@ function RuleForm({
 
   const handleCat3Change = (val: string) => {
     setCat3(val);
-    const resolved = resolveCategory(val);
-    if (resolved) { setCat2(resolved.cat2); setCat1(resolved.cat1); }
   };
 
   const canSave = pattern.trim() && cat3.trim() && cat2.trim() && cat1.trim();

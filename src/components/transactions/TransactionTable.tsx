@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Transaction } from '../../types/transaction';
 import type { ActiveRule } from '../../services/categorizer';
-import { getAllCat3Values, getAllCat2Values, resolveCategory } from '../../config/categories';
+import { getAllCat3Values, getAllCat2Values } from '../../config/categories';
 import { extractGroups, type TransactionGroup } from '../../transforms/groups';
 import { ComboBox } from '../ComboBox';
 import { formatCurrency } from '../../utils/currency';
@@ -232,12 +232,7 @@ export function TransactionTable({
     const newCat3 = column === 'cat3' ? value : (tx.cat3 || '');
     const newCat2 = column === 'cat2' ? value : (tx.cat2 || undefined);
     const newCat1 = column === 'cat1' ? value : (tx.cat1 || undefined);
-    let finalCat2 = newCat2, finalCat1 = newCat1;
-    if (column === 'cat3') {
-      const resolved = resolveCategory(value);
-      if (resolved) { finalCat2 = finalCat2 || resolved.cat2; finalCat1 = finalCat1 || resolved.cat1; }
-    }
-    onCorrect({ txId: tx.id, merchantName: tx.merchantName || tx.details, cat3: newCat3, cat2: finalCat2, cat1: finalCat1 });
+    onCorrect({ txId: tx.id, merchantName: tx.merchantName || tx.details, cat3: newCat3, cat2: newCat2, cat1: newCat1 });
   };
 
   const renderTxRow = (tx: Transaction, isGroupMember: boolean, borderColor?: string) => {
