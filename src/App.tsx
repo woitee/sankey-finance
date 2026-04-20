@@ -16,7 +16,6 @@ import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
 import { CategorizeModal } from './components/CategorizeModal';
 import type { CategorizeResult } from './components/CategorizeModal';
-import { getAllCat2Values } from './config/categories';
 import { resolveGroups, generateGroupId } from './transforms/groups';
 
 type Tab = 'dashboard' | 'transactions' | 'settings';
@@ -545,10 +544,16 @@ export default function App() {
                   height={550}
                   onNodeClick={name => {
                     if (name === 'Income' || name === 'Savings' || name === 'Deficit') return;
-                    const cat2Set = getAllCat2Values();
-                    if (name === 'MUST' || name === 'WANT' || name === 'INCOME') {
+                    const cat1Set = new Set(['MUST', 'WANT', 'INCOME']);
+                    // Derive cat2 nodes from the actual sankey data: targets of MUST/WANT links
+                    const cat2Set = new Set(
+                      sankeyData.links
+                        .filter(l => cat1Set.has(l.source))
+                        .map(l => l.target),
+                    );
+                    if (cat1Set.has(name)) {
                       setTxFilter({ cat1: name });
-                    } else if (cat2Set.includes(name)) {
+                    } else if (cat2Set.has(name)) {
                       setTxFilter({ cat2: name });
                     } else {
                       setTxFilter({ cat3: name });
@@ -557,17 +562,22 @@ export default function App() {
                   }}
                   onLinkClick={(source, target) => {
                     if (target === 'Savings' || target === 'Deficit') return;
-                    const cat1Set = ['MUST', 'WANT', 'INCOME'];
-                    const cat2Set = getAllCat2Values();
+                    const cat1Set = new Set(['MUST', 'WANT', 'INCOME']);
+                    // Derive cat2 nodes from the actual sankey data: targets of MUST/WANT links
+                    const cat2Set = new Set(
+                      sankeyData.links
+                        .filter(l => cat1Set.has(l.source))
+                        .map(l => l.target),
+                    );
                     const filter: CategoryFilter = {};
 
                     if (source !== 'Income' && source !== 'Deficit') {
-                      if (cat1Set.includes(source)) filter.cat1 = source;
-                      else if (cat2Set.includes(source)) filter.cat2 = source;
+                      if (cat1Set.has(source)) filter.cat1 = source;
+                      else if (cat2Set.has(source)) filter.cat2 = source;
                     }
 
-                    if (cat1Set.includes(target)) filter.cat1 = target;
-                    else if (cat2Set.includes(target)) filter.cat2 = target;
+                    if (cat1Set.has(target)) filter.cat1 = target;
+                    else if (cat2Set.has(target)) filter.cat2 = target;
                     else filter.cat3 = target;
 
                     setTxFilter(filter);
