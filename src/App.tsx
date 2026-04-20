@@ -55,13 +55,6 @@ export default function App() {
   // Track which date ranges have been auto-categorized to avoid re-running
   const autoCategorizedRef = useRef<Set<string>>(new Set());
 
-  const [convexTimedOut, setConvexTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setConvexTimedOut(true), 8000);
-    if (convexTxs !== undefined) clearTimeout(t);
-    return () => clearTimeout(t);
-  }, [convexTxs]);
-
   // ── Convex queries ──────────────────────────────────────────────────────────
   const convexTxs = useQuery(
     api.transactions.byDateRange,
@@ -71,6 +64,13 @@ export default function App() {
   const convexActiveRules = useQuery(api.rules.listActive);
   const convexCandidateRules = useQuery(api.rules.listCandidates);
   const convexNicknames = useQuery(api.cardholderNicknames.list);
+
+  const [convexTimedOut, setConvexTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setConvexTimedOut(true), 8000);
+    if (convexTxs !== undefined) clearTimeout(t);
+    return () => clearTimeout(t);
+  }, [convexTxs]);
 
   // ── Convex mutations ────────────────────────────────────────────────────────
   const batchUpdateCategories = useMutation(api.transactions.batchUpdateCategories);
