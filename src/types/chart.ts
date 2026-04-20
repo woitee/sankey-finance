@@ -7,6 +7,7 @@ export interface SankeyLink {
   source: string;
   target: string;
   value: number;
+  mustWant?: number;
 }
 
 export interface SankeyData {

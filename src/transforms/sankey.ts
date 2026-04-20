@@ -31,6 +31,7 @@ export function buildSankeyData(
   const { showCat3 = false } = options;
   const nodes = new Map<string, SankeyNode>();
   const linkMap = new Map<string, number>();
+  const mustWantMap = new Map<string, number>();
 
   const addNode = (name: string, color?: string) => {
     if (!nodes.has(name)) {
@@ -38,10 +39,11 @@ export function buildSankeyData(
     }
   };
 
-  const addLink = (source: string, target: string, value: number) => {
+  const addLink = (source: string, target: string, value: number, mustWant = 0) => {
     if (value <= 0) return;
     const key = `${source}\0${target}`;
     linkMap.set(key, (linkMap.get(key) ?? 0) + value);
+    if (mustWant > 0) mustWantMap.set(key, (mustWantMap.get(key) ?? 0) + mustWant);
   };
 
   const incomeTransactions = transactions.filter(t => t.amount > 0);
@@ -68,22 +70,42 @@ export function buildSankeyData(
   const cat1Totals: Record<string, number> = {};
   const cat2Groups: Record<string, Record<string, number>> = {};
   const cat3Groups: Record<string, Record<string, number>> = {};
+  // Track how much of each (splitC1→c2) and (c2→c3) link came from MUST_WANT transactions
+  const mustWantCat2: Record<string, Record<string, number>> = {};
+  const mustWantCat3: Record<string, Record<string, number>> = {};
 
   for (const t of expenseTransactions) {
     const abs = Math.abs(t.amount);
     const c1 = t.cat1!;
     const c2 = t.cat2!;
     const c3 = t.cat3!;
+    const isMustWant = c1 === 'MUST_WANT';
 
-    cat1Totals[c1] = (cat1Totals[c1] ?? 0) + abs;
+    const splits: Array<[string, number]> = isMustWant
+      ? [['MUST', abs / 2], ['WANT', abs / 2]]
+      : [[c1, abs]];
 
-    if (!cat2Groups[c1]) cat2Groups[c1] = {};
-    cat2Groups[c1][c2] = (cat2Groups[c1][c2] ?? 0) + abs;
+    for (const [splitC1, splitAbs] of splits) {
+      cat1Totals[splitC1] = (cat1Totals[splitC1] ?? 0) + splitAbs;
 
-    if (showCat3 && c3) {
-      const cat2Key = `${c1}\0${c2}`;
-      if (!cat3Groups[cat2Key]) cat3Groups[cat2Key] = {};
-      cat3Groups[cat2Key][c3] = (cat3Groups[cat2Key][c3] ?? 0) + abs;
+      if (!cat2Groups[splitC1]) cat2Groups[splitC1] = {};
+      cat2Groups[splitC1][c2] = (cat2Groups[splitC1][c2] ?? 0) + splitAbs;
+
+      if (isMustWant) {
+        if (!mustWantCat2[splitC1]) mustWantCat2[splitC1] = {};
+        mustWantCat2[splitC1][c2] = (mustWantCat2[splitC1][c2] ?? 0) + splitAbs;
+      }
+
+      if (showCat3 && c3) {
+        const cat2Key = `${splitC1}\0${c2}`;
+        if (!cat3Groups[cat2Key]) cat3Groups[cat2Key] = {};
+        cat3Groups[cat2Key][c3] = (cat3Groups[cat2Key][c3] ?? 0) + splitAbs;
+
+        if (isMustWant) {
+          if (!mustWantCat3[cat2Key]) mustWantCat3[cat2Key] = {};
+          mustWantCat3[cat2Key][c3] = (mustWantCat3[cat2Key][c3] ?? 0) + splitAbs;
+        }
+      }
     }
   }
 
@@ -105,7 +127,7 @@ export function buildSankeyData(
   for (const [c1, cat2Map] of Object.entries(cat2Groups)) {
     for (const [c2, total] of Object.entries(cat2Map)) {
       addNode(c2, CAT2_COLORS[c2]);
-      addLink(c1, c2, total);
+      addLink(c1, c2, total, mustWantCat2[c1]?.[c2] ?? 0);
     }
   }
 
@@ -120,7 +142,10 @@ export function buildSankeyData(
           for (const [c3, c3Total] of Object.entries(c3Map)) {
             if (upstreamNodes.has(c3)) continue; // would create a cycle
             addNode(c3);
-            addLink(c2, c3, c3Total);
+            // Sum mustWant from both MUST and WANT sides for the same c2→c3 link
+            const mwFromMust = mustWantCat3[`MUST\0${c2}`]?.[c3] ?? 0;
+            const mwFromWant = mustWantCat3[`WANT\0${c2}`]?.[c3] ?? 0;
+            addLink(c2, c3, c3Total, mwFromMust + mwFromWant);
           }
         }
       }
@@ -130,7 +155,8 @@ export function buildSankeyData(
   const links: SankeyLink[] = [];
   for (const [key, value] of linkMap.entries()) {
     const [source, target] = key.split('\0');
-    links.push({ source, target, value: Math.round(value) });
+    const mw = mustWantMap.get(key);
+    links.push({ source, target, value: Math.round(value), ...(mw ? { mustWant: Math.round(mw) } : {}) });
   }
 
   return {

@@ -276,12 +276,12 @@ export function TransactionTable({
           {isEditingCat1 ? (
             <select autoFocus value={tx.cat1 || ''} onClick={e => e.stopPropagation()} onChange={e => handleCategoryEdit(tx, 'cat1', e.target.value)} onBlur={() => setTimeout(() => setEditing(null), 150)}
               style={{ background: '#1e1e2e', color: '#cdd6f4', border: '1px solid #6366f1', borderRadius: 4, padding: '2px 4px', fontSize: 12 }}>
-              <option value="">--</option><option value="MUST">MUST</option><option value="WANT">WANT</option><option value="INCOME">INCOME</option><option value="NOISE">NOISE</option>
+              <option value="">--</option><option value="MUST">MUST</option><option value="WANT">WANT</option><option value="MUST_WANT">MUST_WANT</option><option value="INCOME">INCOME</option><option value="NOISE">NOISE</option>
             </select>
           ) : tx.cat1 ? (
             <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-              background: tx.cat1 === 'NOISE' ? '#64748b1a' : tx.cat1 === 'MUST' ? '#e874611a' : tx.cat1 === 'WANT' ? '#6a9fdb1a' : '#6dbf7b1a',
-              color: tx.cat1 === 'NOISE' ? '#64748b' : tx.cat1 === 'MUST' ? '#e87461' : tx.cat1 === 'WANT' ? '#6a9fdb' : '#6dbf7b' }}>
+              background: tx.cat1 === 'NOISE' ? '#64748b1a' : tx.cat1 === 'MUST' ? '#e874611a' : tx.cat1 === 'WANT' ? '#6a9fdb1a' : tx.cat1 === 'MUST_WANT' ? '#c49adf1a' : '#6dbf7b1a',
+              color: tx.cat1 === 'NOISE' ? '#64748b' : tx.cat1 === 'MUST' ? '#e87461' : tx.cat1 === 'WANT' ? '#6a9fdb' : tx.cat1 === 'MUST_WANT' ? '#c49adf' : '#6dbf7b' }}>
               {tx.cat1}
             </span>
           ) : <span style={{ borderBottom: '1px dashed #6366f1', color: '#f59e0b', fontSize: 12 }}>set</span>}

@@ -37,7 +37,11 @@ export function SankeyChart({
       triggerOn: 'mousemove' as const,
       formatter: (params: any) => {
         if (params.dataType === 'edge') {
-          return `${params.data.source} → ${params.data.target}<br/><strong>${formatCurrency(params.data.value)}</strong>`;
+          const mw: number | undefined = params.data.mustWant;
+          const mwLine = mw
+            ? `<br/><span style="color:#c49adf;font-size:11px">⟳ ${formatCurrency(mw)} from MUST/WANT split</span>`
+            : '';
+          return `${params.data.source} → ${params.data.target}<br/><strong>${formatCurrency(params.data.value)}</strong>${mwLine}`;
         }
         return `<strong>${params.name}</strong><br/>${formatCurrency(params.value)}`;
       },

@@ -34,7 +34,7 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
   return z.object({
     categories: z.array(z.object({
       index: z.number(),
-      cat1: z.enum(['MUST', 'WANT', 'INCOME']),
+      cat1: z.enum(['MUST', 'WANT', 'MUST_WANT', 'INCOME']),
       cat2: cat2Enum,
       cat3: z.string(),
     })),
@@ -42,7 +42,7 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
       pattern: z.string(),
       field: z.enum(['merchantName', 'details']),
       matchType: z.enum(['contains', 'exact', 'startsWith']),
-      cat1: z.enum(['MUST', 'WANT', 'INCOME']),
+      cat1: z.enum(['MUST', 'WANT', 'MUST_WANT', 'INCOME']),
       cat2: cat2Enum,
       cat3: z.string(),
     })),
@@ -77,10 +77,11 @@ async function categorizeBatch(
     system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign cat1, cat2, and cat3 for every transaction.
 
 cat1 rules (no exceptions):
-- Negative amounts (money leaving) → MUST or WANT
+- Negative amounts (money leaving) → MUST, WANT, or MUST_WANT
 - Positive amounts (money arriving) → INCOME
 - MUST = non-negotiable recurring expenses (rent, groceries, utilities, health, transport essentials, child essentials, pet essentials)
 - WANT = discretionary spending (restaurants, entertainment, clothes, subscriptions, gadgets, etc.)
+- MUST_WANT = ambiguous expenses that are partially necessary and partially discretionary (e.g. a pharmacy purchase that includes both medicine and cosmetics); split 50/50 between MUST and WANT in reporting
 
 cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(', ')}.
 Do NOT invent new cat2 values. If unsure, use "Other".

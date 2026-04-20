@@ -24,6 +24,7 @@ export function computeSummary(transactions: Transaction[]): StatementSummary {
       totalOutcome += Math.abs(tx.amount);
       if (tx.cat1 === 'MUST') mustTotal += Math.abs(tx.amount);
       else if (tx.cat1 === 'WANT') wantTotal += Math.abs(tx.amount);
+      else if (tx.cat1 === 'MUST_WANT') { mustTotal += Math.abs(tx.amount) / 2; wantTotal += Math.abs(tx.amount) / 2; }
     }
     if (!tx.cat3) uncategorizedCount++;
   }
