@@ -202,7 +202,7 @@ export const applyRulesToImport = action({
       const matched = rules.find(r => matchesRule(tx, r));
       if (!matched) continue;
 
-      if (tx.ruleId === matched._id && tx.cat3 === matched.cat3) continue;
+      if (tx.ruleId === matched._id && tx.cat3 === matched.cat3 && tx.cat1 === matched.cat1 && tx.cat2 === matched.cat2) continue;
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
@@ -234,7 +234,7 @@ export const applyAllRules = action({
       if (!matched) continue;
 
       // Already stamped with this exact rule and correct category — nothing to do
-      if (tx.ruleId === matched._id && tx.cat3 === matched.cat3) continue;
+      if (tx.ruleId === matched._id && tx.cat3 === matched.cat3 && tx.cat1 === matched.cat1 && tx.cat2 === matched.cat2) continue;
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
