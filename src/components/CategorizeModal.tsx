@@ -211,7 +211,7 @@ export function CategorizeModal({
           );
           setPhase({ kind: 'running', batches: [...batchesRef.current] });
           // Continue with fallback (uncategorized)
-          batchResult = { responses: requests.map(() => ({ cat3: 'uncategorized', confidence: 0 })), ruleSuggestions: [] };
+          batchResult = { responses: requests.map(() => ({ cat1: 'WANT', cat2: 'Other', cat3: 'uncategorized', confidence: 0 })), ruleSuggestions: [] };
         }
 
         clearTick();

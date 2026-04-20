@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import App from './App';
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
+console.log('[Convex] connecting to:', convexUrl ?? '(VITE_CONVEX_URL not set)');
+const convex = new ConvexReactClient(convexUrl);
 
 const style = document.createElement('style');
 style.textContent = `

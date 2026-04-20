@@ -55,6 +55,13 @@ export default function App() {
   // Track which date ranges have been auto-categorized to avoid re-running
   const autoCategorizedRef = useRef<Set<string>>(new Set());
 
+  const [convexTimedOut, setConvexTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setConvexTimedOut(true), 8000);
+    if (convexTxs !== undefined) clearTimeout(t);
+    return () => clearTimeout(t);
+  }, [convexTxs]);
+
   // ── Convex queries ──────────────────────────────────────────────────────────
   const convexTxs = useQuery(
     api.transactions.byDateRange,
@@ -414,8 +421,13 @@ export default function App() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Finance Tracker</h1>
-          {txLoading && (
+          {txLoading && !convexTimedOut && (
             <span style={{ fontSize: 12, color: '#64748b' }}>Loading…</span>
+          )}
+          {txLoading && convexTimedOut && (
+            <span style={{ fontSize: 12, color: '#f38ba8' }} title={`VITE_CONVEX_URL: ${import.meta.env.VITE_CONVEX_URL ?? '(not set)'}`}>
+              Convex connection failed — check console
+            </span>
           )}
           <DateRangePicker from={from} to={to} onChange={handleDateRange} />
           {/* Account filter — only show when there are multiple accounts */}
