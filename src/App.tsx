@@ -67,6 +67,7 @@ export default function App() {
 
   // ── Convex mutations ────────────────────────────────────────────────────────
   const batchUpdateCategories = useMutation(api.transactions.batchUpdateCategories);
+  const updateCategoriesMutation = useMutation(api.transactions.updateCategories);
   const updateGroupMutation = useMutation(api.transactions.updateGroup);
   const batchCreateCandidates = useMutation(api.rules.batchCreateCandidates);
   const batchDeleteMutation = useMutation(api.transactions.batchDelete);
@@ -637,6 +638,29 @@ export default function App() {
                     setTimeout(() => { el.style.outline = ''; }, 1500);
                   }
                 }, 50);
+              }}
+              onCreateRule={async tx => {
+                const created = await batchCreateCandidates({
+                  rules: [{
+                    pattern: tx.merchantName || tx.details,
+                    field: 'merchantName',
+                    matchType: 'contains',
+                    cat3: tx.cat3 || '',
+                    cat2: tx.cat2 ?? null,
+                    cat1: tx.cat1 ?? null,
+                  }],
+                });
+                const rule = created[0];
+                if (rule) {
+                  await updateCategoriesMutation({
+                    id: (tx as TxDoc)._convexId,
+                    cat3: tx.cat3 ?? null,
+                    cat2: tx.cat2 ?? null,
+                    cat1: tx.cat1 ?? null,
+                    categorizationSource: 'unverified_rule',
+                    ruleId: rule._id,
+                  });
+                }
               }}
             />
           </div>

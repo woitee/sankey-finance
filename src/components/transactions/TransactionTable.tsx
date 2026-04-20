@@ -68,6 +68,7 @@ export function TransactionTable({
   onDelete,
   onRecategorizeWithAI,
   categorizing = false,
+  onCreateRule,
 }: {
   transactions: Transaction[];
   onCorrect: (payload: CategoryEditPayload) => void;
@@ -81,6 +82,7 @@ export function TransactionTable({
   onDelete?: (ids: string[]) => void;
   onRecategorizeWithAI?: (ids: string[]) => void;
   categorizing?: boolean;
+  onCreateRule?: (tx: Transaction) => void;
 }) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [text, setText] = useState(initialFilter.text ?? '');
@@ -305,27 +307,41 @@ export function TransactionTable({
           ) : <span style={{ borderBottom: '1px dashed #6366f1', color: tx.cat3 ? '#cdd6f4' : '#f59e0b' }}>{tx.cat3 || 'click to set'}</span>}
         </td>
         <td style={{ padding: '8px 12px', fontSize: 11 }}>
-          {tx.ruleId && ruleMap.has(tx.ruleId) ? (
-            <span
-              title={`${ruleMap.get(tx.ruleId)!.field} ${ruleMap.get(tx.ruleId)!.matchType} "${ruleMap.get(tx.ruleId)!.pattern}"`}
-              onClick={() => onRuleClick?.(tx.ruleId!)}
-              style={{ color: '#89b4fa', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
-              rule: {ruleMap.get(tx.ruleId)!.pattern}
-            </span>
-          ) : tx.ruleId && candidateRuleMap.has(tx.ruleId) ? (
-            <span
-              title={`${candidateRuleMap.get(tx.ruleId)!.field} ${candidateRuleMap.get(tx.ruleId)!.matchType} "${candidateRuleMap.get(tx.ruleId)!.pattern}"`}
-              onClick={() => onRuleClick?.(tx.ruleId!)}
-              style={{ color: '#f59e0b', fontStyle: 'italic', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
-              cand. rule: {candidateRuleMap.get(tx.ruleId)!.pattern}
-            </span>
-          ) : tx.ruleId ? (
-            <span style={{ color: '#64748b', fontStyle: 'italic' }}>deleted rule</span>
-          ) : (
-            <span style={{ color: '#64748b' }}>
-              {tx.categorizationSource ?? '—'}
-            </span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {tx.ruleId && ruleMap.has(tx.ruleId) ? (
+              <span
+                title={`${ruleMap.get(tx.ruleId)!.field} ${ruleMap.get(tx.ruleId)!.matchType} "${ruleMap.get(tx.ruleId)!.pattern}"`}
+                onClick={() => onRuleClick?.(tx.ruleId!)}
+                style={{ color: '#89b4fa', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
+                rule: {ruleMap.get(tx.ruleId)!.pattern}
+              </span>
+            ) : tx.ruleId && candidateRuleMap.has(tx.ruleId) ? (
+              <span
+                title={`${candidateRuleMap.get(tx.ruleId)!.field} ${candidateRuleMap.get(tx.ruleId)!.matchType} "${candidateRuleMap.get(tx.ruleId)!.pattern}"`}
+                onClick={() => onRuleClick?.(tx.ruleId!)}
+                style={{ color: '#f59e0b', fontStyle: 'italic', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
+                cand. rule: {candidateRuleMap.get(tx.ruleId)!.pattern}
+              </span>
+            ) : tx.ruleId ? (
+              <span style={{ color: '#64748b', fontStyle: 'italic' }}>deleted rule</span>
+            ) : (
+              <span style={{ color: '#64748b' }}>
+                {tx.categorizationSource ?? '—'}
+              </span>
+            )}
+            {onCreateRule && (
+              (!tx.ruleId && (tx.categorizationSource === 'manual' || tx.categorizationSource === 'llm')) ||
+              (tx.ruleId && !ruleMap.has(tx.ruleId) && !candidateRuleMap.has(tx.ruleId))
+            ) && (
+              <button
+                onClick={e => { e.stopPropagation(); onCreateRule(tx); }}
+                title={`Create candidate rule: merchantName contains "${tx.merchantName || tx.details}"`}
+                style={{ ...btnStyle, fontSize: 10, padding: '2px 6px', color: '#a6e3a1', borderColor: '#a6e3a133', flexShrink: 0 }}
+              >
+                + rule
+              </button>
+            )}
+          </div>
         </td>
       </tr>
     );
