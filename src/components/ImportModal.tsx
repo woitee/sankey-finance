@@ -179,7 +179,13 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             <div style={{ fontSize: 15, color: '#cdd6f4', marginBottom: 6 }}>Drop a bank statement here</div>
             <div style={{ fontSize: 13 }}>or click to browse</div>
             <div style={{ fontSize: 11, marginTop: 12, color: '#45475a' }}>
-              Supported: {PARSERS.map(p => p.name).join(', ')} · AI fallback available
+              <div>Supported banks:</div>
+              <ul style={{ margin: '6px 0 4px', paddingLeft: 18, textAlign: 'left', display: 'inline-block' }}>
+                {PARSERS.map(parser => (
+                  <li key={parser.name}>{parser.name}</li>
+                ))}
+              </ul>
+              <div>AI fallback available</div>
             </div>
             <input ref={fileInputRef} type="file" accept=".pdf,.csv,.xlsx,.xls"
               style={{ display: 'none' }}
