@@ -1,6 +1,7 @@
 import type { BankParser } from './types';
 import { AirBankPdfParser } from './airBankPdf';
 import { CsobPdfParser } from './csobPdf';
+import { MonetaPdfParser } from './monetaPdf';
 
 /**
  * Ordered list of parsers. First match wins.
@@ -9,6 +10,7 @@ import { CsobPdfParser } from './csobPdf';
 export const PARSERS: BankParser[] = [
   new AirBankPdfParser(),
   new CsobPdfParser(),
+  new MonetaPdfParser(),
   // new RevolutCsvParser(),
   // new MBankCsvParser(),
 ];
