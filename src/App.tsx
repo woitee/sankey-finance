@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { startTransition, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import type { Id } from '../convex/_generated/dataModel';
 import { api } from '../convex/_generated/api';
@@ -20,6 +20,14 @@ import { resolveGroups, generateGroupId } from './transforms/groups';
 
 type Tab = 'dashboard' | 'transactions' | 'settings';
 
+type RouteState = {
+  tab: Tab;
+  from: string;
+  to: string;
+  txFilter: CategoryFilter;
+  ruleId: string | null;
+};
+
 // Convex document extended with the Convex _id for mutations
 type TxDoc = Transaction & {
   _convexId: Id<'transactions'>;
@@ -40,16 +48,97 @@ function getDefaultDateRange(): { from: string; to: string } {
   return { from: formatLocalDate(from), to: formatLocalDate(now) };
 }
 
-export default function App() {
+function isValidDateString(value: string | null): value is string {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function normalizeFilter(filter: CategoryFilter): CategoryFilter {
+  return {
+    ...(filter.text ? { text: filter.text } : {}),
+    ...(filter.cat1 ? { cat1: filter.cat1 } : {}),
+    ...(filter.cat2 ? { cat2: filter.cat2 } : {}),
+    ...(filter.cat3 ? { cat3: filter.cat3 } : {}),
+  };
+}
+
+function parseRoute(location: Location): RouteState {
   const defaults = getDefaultDateRange();
-  const [from, setFrom] = useState(defaults.from);
-  const [to, setTo] = useState(defaults.to);
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const pathname = location.pathname.replace(/\/+$/, '') || '/';
+  const params = new URLSearchParams(location.search);
+  const rawFrom = params.get('from');
+  const rawTo = params.get('to');
+  const from = isValidDateString(rawFrom) ? rawFrom : defaults.from;
+  const to = isValidDateString(rawTo) ? rawTo : defaults.to;
+
+  if (pathname === '/transactions') {
+    return {
+      tab: 'transactions',
+      from,
+      to,
+      txFilter: normalizeFilter({
+        text: params.get('text') ?? undefined,
+        cat1: params.get('cat1') ?? undefined,
+        cat2: params.get('cat2') ?? undefined,
+        cat3: params.get('cat3') ?? undefined,
+      }),
+      ruleId: null,
+    };
+  }
+
+  if (pathname === '/settings') {
+    return {
+      tab: 'settings',
+      from,
+      to,
+      txFilter: {},
+      ruleId: params.get('rule'),
+    };
+  }
+
+  return {
+    tab: 'dashboard',
+    from,
+    to,
+    txFilter: {},
+    ruleId: null,
+  };
+}
+
+function buildRouteUrl(route: RouteState): string {
+  const params = new URLSearchParams();
+  params.set('from', route.from);
+  params.set('to', route.to);
+
+  if (route.tab === 'transactions') {
+    if (route.txFilter.text) params.set('text', route.txFilter.text);
+    if (route.txFilter.cat1) params.set('cat1', route.txFilter.cat1);
+    if (route.txFilter.cat2) params.set('cat2', route.txFilter.cat2);
+    if (route.txFilter.cat3) params.set('cat3', route.txFilter.cat3);
+    const search = params.toString();
+    return `/transactions${search ? `?${search}` : ''}`;
+  }
+
+  if (route.tab === 'settings') {
+    if (route.ruleId) params.set('rule', route.ruleId);
+    const search = params.toString();
+    return `/settings${search ? `?${search}` : ''}`;
+  }
+
+  const search = params.toString();
+  return `/${search ? `?${search}` : ''}`;
+}
+
+export default function App() {
+  const initialRoute = parseRoute(window.location);
+  const [from, setFrom] = useState(initialRoute.from);
+  const [to, setTo] = useState(initialRoute.to);
+  const [tab, setTab] = useState<Tab>(initialRoute.tab);
   const [showImport, setShowImport] = useState(false);
   const [categorizeModalTxs, setCategorizeModalTxs] = useState<TxDoc[] | null>(null);
   const [categorizeModalIsAll, setCategorizeModalIsAll] = useState(false);
   const [showCat3, setShowCat3] = useState(false);
-  const [txFilter, setTxFilter] = useState<CategoryFilter>({});
+  const [txFilter, setTxFilter] = useState<CategoryFilter>(initialRoute.txFilter);
+  const [focusedRuleId, setFocusedRuleId] = useState<string | null>(initialRoute.ruleId);
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
 
   // Track which date ranges have been auto-categorized to avoid re-running
@@ -393,11 +482,91 @@ export default function App() {
   const summary = computeSummary(effectiveTransactions);
   const sankeyData = buildSankeyData(effectiveTransactions, { showCat3 });
 
+  const applyRoute = useCallback((route: RouteState) => {
+    startTransition(() => {
+      setFrom(route.from);
+      setTo(route.to);
+      setTab(route.tab);
+      setTxFilter(route.txFilter);
+      setFocusedRuleId(route.ruleId);
+    });
+  }, []);
+
+  const navigateTo = useCallback(
+    (nextRoute: RouteState, options?: { replace?: boolean }) => {
+      const normalizedRoute = {
+        ...nextRoute,
+        txFilter: normalizeFilter(nextRoute.txFilter),
+      };
+      const nextUrl = buildRouteUrl(normalizedRoute);
+      const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+      if (nextUrl !== currentUrl) {
+        if (options?.replace) window.history.replaceState(null, '', nextUrl);
+        else window.history.pushState(null, '', nextUrl);
+      }
+
+      applyRoute(normalizedRoute);
+    },
+    [applyRoute],
+  );
+
   // ── Date range handler ───────────────────────────────────────────────────────
   const handleDateRange = useCallback((newFrom: string, newTo: string) => {
-    setFrom(newFrom);
-    setTo(newTo);
-  }, []);
+    navigateTo({ tab, from: newFrom, to: newTo, txFilter, ruleId: focusedRuleId });
+  }, [focusedRuleId, navigateTo, tab, txFilter]);
+
+  useEffect(() => {
+    const route = parseRoute(window.location);
+    const canonicalUrl = buildRouteUrl(route);
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (canonicalUrl !== currentUrl) {
+      window.history.replaceState(null, '', canonicalUrl);
+    }
+    applyRoute(route);
+  }, [applyRoute]);
+
+  useEffect(() => {
+    const handlePopState = () => applyRoute(parseRoute(window.location));
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [applyRoute]);
+
+  useEffect(() => {
+    if (tab !== 'settings' || !focusedRuleId) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let retryTimeout: number | undefined;
+    let clearOutlineTimeout: number | undefined;
+
+    const highlightRule = () => {
+      if (cancelled) return;
+
+      const el = document.getElementById(`rule-${focusedRuleId}`);
+      if (!el) {
+        if (attempts < 20) {
+          attempts += 1;
+          retryTimeout = window.setTimeout(highlightRule, 100);
+        }
+        return;
+      }
+
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid #89b4fa';
+      clearOutlineTimeout = window.setTimeout(() => {
+        el.style.outline = '';
+      }, 1500);
+    };
+
+    highlightRule();
+
+    return () => {
+      cancelled = true;
+      if (retryTimeout) window.clearTimeout(retryTimeout);
+      if (clearOutlineTimeout) window.clearTimeout(clearOutlineTimeout);
+    };
+  }, [tab, focusedRuleId]);
 
   return (
     <div
@@ -420,7 +589,21 @@ export default function App() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Finance Tracker</h1>
+          <button
+            onClick={() => navigateTo({ tab: 'dashboard', from, to, txFilter, ruleId: null })}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#cdd6f4',
+              cursor: 'pointer',
+              fontSize: 20,
+              fontWeight: 700,
+              margin: 0,
+              padding: 0,
+            }}
+          >
+            Finance Tracker
+          </button>
           {txLoading && !convexTimedOut && (
             <span style={{ fontSize: 12, color: '#64748b' }}>Loading…</span>
           )}
@@ -453,16 +636,21 @@ export default function App() {
             </select>
           )}
         </div>
-        <nav style={{ display: 'flex', gap: 8 }}>
-          {(['dashboard', 'transactions', 'settings'] as Tab[]).map(t => (
-            <button
-              key={t}
-              onClick={() => {
-                setTab(t);
-                if (t === 'transactions') setTxFilter({});
-              }}
-              style={{
-                padding: '8px 16px',
+          <nav style={{ display: 'flex', gap: 8 }}>
+            {(['dashboard', 'transactions', 'settings'] as Tab[]).map(t => (
+              <button
+                key={t}
+                onClick={() => {
+                  navigateTo({
+                    tab: t,
+                    from,
+                    to,
+                    txFilter: t === 'transactions' ? {} : txFilter,
+                    ruleId: null,
+                  });
+                }}
+                style={{
+                  padding: '8px 16px',
                 borderRadius: 8,
                 border: 'none',
                 cursor: 'pointer',
@@ -565,13 +753,12 @@ export default function App() {
                         .map(l => l.target),
                     );
                     if (cat1Set.has(name)) {
-                      setTxFilter({ cat1: name });
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat1: name }, ruleId: null });
                     } else if (cat2Set.has(name)) {
-                      setTxFilter({ cat2: name });
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat2: name }, ruleId: null });
                     } else {
-                      setTxFilter({ cat3: name });
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat3: name }, ruleId: null });
                     }
-                    setTab('transactions');
                   }}
                   onLinkClick={(source, target) => {
                     if (target === 'Savings' || target === 'Deficit') return;
@@ -593,8 +780,7 @@ export default function App() {
                     else if (cat2Set.has(target)) filter.cat2 = target;
                     else filter.cat3 = target;
 
-                    setTxFilter(filter);
-                    setTab('transactions');
+                    navigateTo({ tab: 'transactions', from, to, txFilter: filter, ruleId: null });
                   }}
                 />
               ) : (
@@ -641,15 +827,7 @@ export default function App() {
               onRecategorizeWithAI={handleRecategorizeSelected}
               categorizing={categorizeModalTxs !== null}
               onRuleClick={ruleId => {
-                setTab('settings');
-                setTimeout(() => {
-                  const el = document.getElementById(`rule-${ruleId}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.style.outline = '2px solid #89b4fa';
-                    setTimeout(() => { el.style.outline = ''; }, 1500);
-                  }
-                }, 50);
+                navigateTo({ tab: 'settings', from, to, txFilter, ruleId });
               }}
               onCreateRule={async tx => {
                 const created = await batchCreateCandidates({
@@ -695,7 +873,10 @@ export default function App() {
             activeRules={activeRules}
             onDone={handleCategorizeModalDone}
             onClose={() => setCategorizeModalTxs(null)}
-            onViewCandidates={() => { setCategorizeModalTxs(null); setTab('settings'); }}
+            onViewCandidates={() => {
+              setCategorizeModalTxs(null);
+              navigateTo({ tab: 'settings', from, to, txFilter, ruleId: null });
+            }}
           />
         ) : (
           <CategorizeModal

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 function fmt(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -58,6 +58,19 @@ function monthOptions(): Option[] {
   return options;
 }
 
+function getPickerState(from: string, to: string): { mode: Mode; selectedLabel: string } {
+  const monthMatch = monthOptions().find(option => option.from === from && option.to === to);
+  if (monthMatch) return { mode: 'month', selectedLabel: monthMatch.label };
+
+  const quarterMatch = quarterOptions().find(option => option.from === from && option.to === to);
+  if (quarterMatch) return { mode: 'quarter', selectedLabel: quarterMatch.label };
+
+  const yearMatch = yearOptions().find(option => option.from === from && option.to === to);
+  if (yearMatch) return { mode: 'year', selectedLabel: yearMatch.label };
+
+  return { mode: 'custom', selectedLabel: '' };
+}
+
 interface DateRangePickerProps {
   from: string;
   to: string;
@@ -76,8 +89,22 @@ const selectStyle: React.CSSProperties = {
 };
 
 export function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
-  const [mode, setMode] = useState<Mode>('month');
-  const [selectedLabel, setSelectedLabel] = useState<string>(() => monthOptions()[0].label);
+  const pickerState = useMemo(() => getPickerState(from, to), [from, to]);
+  const [mode, setMode] = useState<Mode>(() => pickerState.mode);
+  const [selectedLabel, setSelectedLabel] = useState<string>(() => pickerState.selectedLabel);
+  const lastSyncedRange = useRef({ from, to });
+
+  if (lastSyncedRange.current.from !== from || lastSyncedRange.current.to !== to) {
+    lastSyncedRange.current = { from, to };
+
+    if (mode !== pickerState.mode) {
+      setMode(pickerState.mode);
+    }
+
+    if (selectedLabel !== pickerState.selectedLabel) {
+      setSelectedLabel(pickerState.selectedLabel);
+    }
+  }
 
   const options = useMemo((): Option[] => {
     if (mode === 'year') return yearOptions();
