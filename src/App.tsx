@@ -4,7 +4,6 @@ import type { Id } from '../convex/_generated/dataModel';
 import { api } from '../convex/_generated/api';
 import type { Transaction } from './types/transaction';
 import { categorizeTransactions, matchesRule } from './services/categorizer';
-import { buildLegacyMatcher } from './rules/matcher';
 import type { ActiveRule } from './services/categorizer';
 import { buildSankeyData } from './transforms/sankey';
 import { computeSummary } from './transforms/summary';
@@ -218,8 +217,6 @@ export default function App() {
           pattern: r.pattern,
           field: r.field,
           matchType: r.matchType,
-          caseSensitive: r.caseSensitive,
-          matcher: r.matcher,
           cat3: r.cat3,
           cat2: r.cat2 ?? null,
           cat1: r.cat1 ?? null,
@@ -288,8 +285,6 @@ export default function App() {
           pattern: r.pattern,
           field: r.field,
           matchType: r.matchType,
-          caseSensitive: r.caseSensitive,
-          matcher: r.matcher,
           cat3: r.cat3,
           cat2: r.cat2 ?? null,
           cat1: r.cat1 ?? null,
@@ -668,13 +663,6 @@ export default function App() {
                     pattern,
                     field,
                     matchType: 'contains',
-                    caseSensitive: false,
-                    matcher: buildLegacyMatcher({
-                      pattern,
-                      field,
-                      matchType: 'contains',
-                      caseSensitive: false,
-                    }),
                     cat3: tx.cat3 || '',
                     cat2: tx.cat2 ?? null,
                     cat1: tx.cat1 ?? null,

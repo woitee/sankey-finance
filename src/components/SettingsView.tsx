@@ -307,6 +307,46 @@ function matcherHasBlankPattern(matcher: RuleMatcher): boolean {
   return matcher.conditions.some(matcherHasBlankPattern);
 }
 
+function isLegacyCompatibleMatcher(matcher: RuleMatcher): boolean {
+  return matcher.kind === 'condition'
+    && !matcher.caseSensitive
+    && (matcher.matchType === 'contains' || matcher.matchType === 'exact' || matcher.matchType === 'startsWith');
+}
+
+function isConvexLegacyValidatorError(error: unknown): boolean {
+  const message = String((error as any)?.message ?? error ?? '');
+  return message.includes('ArgumentValidationError')
+    && (message.includes('extra field `caseSensitive`') || message.includes('extra field `matcher`'));
+}
+
+function toLegacyRulePayload(values: RuleFormValues) {
+  return {
+    pattern: values.pattern,
+    field: values.field,
+    matchType: values.matchType,
+    cat3: values.cat3,
+    cat2: values.cat2 || null,
+    cat1: values.cat1 || null,
+  };
+}
+
+async function mutateRuleWithCompatibility(
+  mutate: (payload: any) => Promise<any>,
+  values: RuleFormValues,
+  extras: Record<string, unknown> = {},
+) {
+  const fullPayload = { ...values, ...extras, cat2: values.cat2 || null, cat1: values.cat1 || null };
+  if (isLegacyCompatibleMatcher(values.matcher)) {
+    return await mutate({ ...toLegacyRulePayload(values), ...extras });
+  }
+  try {
+    return await mutate(fullPayload);
+  } catch (error) {
+    if (!isConvexLegacyValidatorError(error)) throw error;
+    throw new Error('Advanced rule filters need the Convex backend to be redeployed. Simple contains/exact/starts with rules still work.');
+  }
+}
+
 function RuleDescription({ rule }: { rule: any }) {
   const cat2 = rule.cat2 ?? resolveCategory(rule.cat3)?.cat2;
   const cat1 = rule.cat1 ?? resolveCategory(rule.cat3)?.cat1;
@@ -522,7 +562,7 @@ function CandidateRules() {
           key={rule._id}
           initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
           saveLabel="Save"
-          onSave={async vals => { await updateRule({ id: rule._id, ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null }); setEditing(null); }}
+          onSave={async vals => { await mutateRuleWithCompatibility(updateRule, vals, { id: rule._id }); setEditing(null); }}
           onCancel={() => setEditing(null)}
         />
       ) : (
@@ -588,7 +628,7 @@ function ActiveRules() {
         <RuleForm
           saveLabel="Add"
           onSave={async vals => {
-            await createRule({ ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null, source: 'manual' });
+            await mutateRuleWithCompatibility(createRule, vals, { source: 'manual' });
             setAdding(false);
           }}
           onCancel={() => setAdding(false)}
@@ -637,7 +677,7 @@ function ActiveRules() {
                   initial={{ cat1: cat1Label, cat2: cat2Label }}
                   saveLabel="Add"
                   onSave={async vals => {
-                    await createRule({ ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null, source: 'manual' });
+                    await mutateRuleWithCompatibility(createRule, vals, { source: 'manual' });
                     setAddingToGroup(null);
                   }}
                   onCancel={() => setAddingToGroup(null)}
@@ -648,7 +688,7 @@ function ActiveRules() {
                   key={rule._id}
                   initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
                   saveLabel="Save"
-                  onSave={async vals => { await updateRule({ id: rule._id, ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null }); setEditing(null); }}
+                  onSave={async vals => { await mutateRuleWithCompatibility(updateRule, vals, { id: rule._id }); setEditing(null); }}
                   onCancel={() => setEditing(null)}
                 />
               ) : (
