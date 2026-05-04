@@ -65,6 +65,8 @@ export default defineSchema({
 
   imports: defineTable({
     filename: v.string(),        // original file name
+    fileContentType: v.optional(v.string()),
+    fileStorageId: v.optional(v.string()),
     parserName: v.string(),      // e.g. "Air Bank (Czech Republic)" or "AI (Claude)"
     importedAt: v.string(),      // ISO timestamp
     period: v.string(),          // YYYY-MM from the parsed statement
