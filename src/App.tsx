@@ -27,6 +27,13 @@ type TxDoc = Transaction & {
   bankAccountNumber?: string;
 };
 
+type StatementDoc = {
+  period: string;
+  accountNumber: string;
+  openingBalance: number;
+  closingBalance: number;
+};
+
 function formatLocalDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -60,10 +67,21 @@ export default function App() {
     api.transactions.byDateRange,
     from && to ? { from, to } : 'skip',
   );
+  const convexStatements = useQuery(api.statements.list);
   const convexAccounts = useQuery(api.accounts.list);
   const convexActiveRules = useQuery(api.rules.listActive);
   const convexCandidateRules = useQuery(api.rules.listCandidates);
   const convexNicknames = useQuery(api.cardholderNicknames.list);
+  const startPeriod = from.slice(0, 7);
+  const endPeriod = to.slice(0, 7);
+  const convexStartPeriodTxs = useQuery(
+    api.transactions.byPeriod,
+    startPeriod ? { period: startPeriod } : 'skip',
+  );
+  const convexEndPeriodTxs = useQuery(
+    api.transactions.byPeriod,
+    endPeriod ? { period: endPeriod } : 'skip',
+  );
 
   const [convexTimedOut, setConvexTimedOut] = useState(false);
   useEffect(() => {
@@ -155,6 +173,89 @@ export default function App() {
   );
 
   const txLoading = convexTxs === undefined;
+
+  const summaryBalanceCards = useMemo(() => {
+    if (
+      convexStatements === undefined ||
+      convexStartPeriodTxs === undefined ||
+      convexEndPeriodTxs === undefined
+    ) {
+      return [];
+    }
+
+    const statements = convexStatements as StatementDoc[];
+    const statementMap = new Map(
+      statements.map(statement => [
+        `${statement.accountNumber}::${statement.period}`,
+        statement,
+      ]),
+    );
+
+    const visibleAccounts = new Set(
+      allTransactions
+        .map(tx => tx.bankAccountNumber)
+        .filter((account): account is string => Boolean(account)),
+    );
+    const statementAccounts = new Set(
+      statements
+        .map(statement => statement.accountNumber)
+        .filter(account => selectedAccount === 'all' || account === selectedAccount),
+    );
+
+    const relevantAccounts =
+      selectedAccount === 'all'
+        ? new Set([...visibleAccounts, ...statementAccounts])
+        : new Set(selectedAccount ? [selectedAccount] : []);
+
+    if (relevantAccounts.size === 0) return [];
+
+    const computeBalanceAt = (period: string, boundaryDate: string, periodTxs: typeof convexStartPeriodTxs, inclusive: boolean) => {
+      let total = 0;
+
+      for (const accountNumber of relevantAccounts) {
+        const statement = statementMap.get(`${accountNumber}::${period}`);
+        if (!statement) return null;
+
+        const matchingTxs = periodTxs.filter(tx => tx.bankAccountNumber === accountNumber);
+        const delta = matchingTxs.reduce((sum, tx) => {
+          const inRange = inclusive ? tx.datePosted <= boundaryDate : tx.datePosted < boundaryDate;
+          return inRange ? sum + tx.amount : sum;
+        }, 0);
+
+        total += statement.openingBalance + delta;
+      }
+
+      return total;
+    };
+
+    const startBalance = computeBalanceAt(startPeriod, from, convexStartPeriodTxs, false);
+    const endBalance = computeBalanceAt(endPeriod, to, convexEndPeriodTxs, true);
+
+    if (startBalance === null || endBalance === null) return [];
+
+    return [
+      {
+        label: 'Starting State',
+        value: startBalance,
+        color: '#f9c74f',
+      },
+      {
+        label: 'Ending State',
+        value: endBalance,
+        color: '#89b4fa',
+      },
+    ];
+  }, [
+    allTransactions,
+    convexEndPeriodTxs,
+    convexStartPeriodTxs,
+    convexStatements,
+    endPeriod,
+    from,
+    selectedAccount,
+    startPeriod,
+    to,
+  ]);
 
   // ── Persist categorization changes back to Convex ───────────────────────────
   const persistCategorization = useCallback(
@@ -519,7 +620,7 @@ export default function App() {
       <main style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
         {tab === 'dashboard' && (
           <>
-            <SummaryCards summary={summary} />
+            <SummaryCards summary={summary} balanceCards={summaryBalanceCards} />
             <div
               style={{
                 background: '#181825',
