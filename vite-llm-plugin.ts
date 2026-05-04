@@ -41,7 +41,7 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
     rules: z.array(z.object({
       pattern: z.string(),
       field: z.enum(['merchantName', 'details']),
-      matchType: z.enum(['contains', 'exact', 'startsWith']),
+      matchType: z.enum(['contains', 'exact', 'startsWith', 'word', 'regex']),
       cat1: z.enum(['MUST', 'WANT', 'MUST/WANT', 'INCOME']),
       cat2: cat2Enum,
       cat3: z.string(),
@@ -125,7 +125,7 @@ Category reference (examples of what belongs where):
 - uncategorized: only if truly cannot determine — do not default to this
 
 Suggest reusable rules for recurring merchants you recognize with high confidence.
-Rule structure: "pattern" must be the SHORTEST string that uniquely identifies the brand — just the brand name, nothing else. Strip location suffixes, store codes, and transaction noise. Examples: "IKEA" not "IKEA ZLICIN OD ECO", "McDonald" not "McDonald's Praha 5", "Netflix" not "NETFLIX.COM". "matchType" says how: contains/exact/startsWith. Example: { pattern: "IKEA", field: "merchantName", matchType: "contains", ... }. Omit rules for one-off or ambiguous transactions.`,
+Rule structure: "pattern" must be the SHORTEST string that uniquely identifies the brand — just the brand name, nothing else. Strip location suffixes, store codes, and transaction noise. Examples: "IKEA" not "IKEA ZLICIN OD ECO", "McDonald" not "McDonald's Praha 5", "Netflix" not "NETFLIX.COM". "matchType" says how: contains/exact/startsWith/word/regex. Prefer contains or word for normal merchants; use regex only when needed. Example: { pattern: "IKEA", field: "merchantName", matchType: "contains", ... }. Omit rules for one-off or ambiguous transactions.`,
     messages: [
       {
         role: 'user',
@@ -149,7 +149,7 @@ ${transactionList}`,
     };
   });
 
-  const MATCH_TYPE_KEYWORDS = new Set(['contains', 'exact', 'startsWith']);
+  const MATCH_TYPE_KEYWORDS = new Set(['contains', 'exact', 'startsWith', 'word', 'regex']);
   const ruleSuggestions = (object.rules ?? [])
     .filter(r => r.pattern.trim() && validCat3Values.includes(r.cat3) && !MATCH_TYPE_KEYWORDS.has(r.pattern.trim()))
     .map(r => ({ ...r, pattern: r.pattern.trim() }));

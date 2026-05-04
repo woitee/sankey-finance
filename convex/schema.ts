@@ -86,7 +86,9 @@ export default defineSchema({
     // Matching
     pattern: v.string(),
     field: v.union(v.literal("merchantName"), v.literal("details")),
-    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith")),
+    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith"), v.literal("word"), v.literal("regex")),
+    caseSensitive: v.optional(v.boolean()),
+    matcher: v.optional(v.any()),
     // Category outcome
     cat3: v.string(),
     cat2: v.union(v.string(), v.null()),

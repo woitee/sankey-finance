@@ -5,6 +5,7 @@ import { getAllCat3Values, getAllCat2Values } from '../../config/categories';
 import { extractGroups, type TransactionGroup } from '../../transforms/groups';
 import { ComboBox } from '../ComboBox';
 import { formatCurrency } from '../../utils/currency';
+import { describeMatcher, getRuleMatcher } from '../../rules/matcher';
 
 export type CategoryFilter = {
   text?: string;
@@ -310,14 +311,14 @@ export function TransactionTable({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {tx.ruleId && ruleMap.has(tx.ruleId) ? (
               <span
-                title={`${ruleMap.get(tx.ruleId)!.field} ${ruleMap.get(tx.ruleId)!.matchType} "${ruleMap.get(tx.ruleId)!.pattern}"`}
+                title={describeMatcher(getRuleMatcher(ruleMap.get(tx.ruleId)!))}
                 onClick={() => onRuleClick?.(tx.ruleId!)}
                 style={{ color: '#89b4fa', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
                 rule: {ruleMap.get(tx.ruleId)!.pattern}
               </span>
             ) : tx.ruleId && candidateRuleMap.has(tx.ruleId) ? (
               <span
-                title={`${candidateRuleMap.get(tx.ruleId)!.field} ${candidateRuleMap.get(tx.ruleId)!.matchType} "${candidateRuleMap.get(tx.ruleId)!.pattern}"`}
+                title={describeMatcher(getRuleMatcher(candidateRuleMap.get(tx.ruleId)!))}
                 onClick={() => onRuleClick?.(tx.ruleId!)}
                 style={{ color: '#f59e0b', fontStyle: 'italic', cursor: onRuleClick ? 'pointer' : 'default', textDecoration: onRuleClick ? 'underline' : 'none', textDecorationStyle: 'dotted' }}>
                 cand. rule: {candidateRuleMap.get(tx.ruleId)!.pattern}

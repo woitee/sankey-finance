@@ -2,6 +2,58 @@ import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import {
+  areMatchersEquivalent,
+  findInvalidRegex,
+  getPrimaryCondition,
+  getRuleMatcher,
+  matchesTransactionRule,
+  serializeMatcher,
+} from "../src/rules/matcher";
+import type { RuleLike, RuleMatcher } from "../src/rules/matcher";
+
+const matchTypeValidator = v.union(
+  v.literal("contains"),
+  v.literal("exact"),
+  v.literal("startsWith"),
+  v.literal("word"),
+  v.literal("regex"),
+);
+
+function normalizeRulePayload<T extends {
+  pattern: string;
+  field: "merchantName" | "details";
+  matchType: "contains" | "exact" | "startsWith" | "word" | "regex";
+  caseSensitive?: boolean | undefined;
+  matcher?: RuleMatcher | null;
+}>(payload: T) {
+  const matcher = getRuleMatcher(payload);
+  const invalidRegex = findInvalidRegex(matcher);
+  if (invalidRegex) throw new Error(invalidRegex);
+  const primary = getPrimaryCondition(matcher);
+  return {
+    ...payload,
+    pattern: primary.pattern,
+    field: primary.field,
+    matchType: primary.matchType,
+    caseSensitive: primary.caseSensitive ?? false,
+    matcher,
+  };
+}
+
+async function ensureUniqueRuleMatcher(
+  ctx: any,
+  matcher: ReturnType<typeof getRuleMatcher>,
+  excludeId?: Id<"rules">,
+) {
+  const existingRules = await ctx.db.query("rules").collect();
+  const duplicate = existingRules.find((rule: any) =>
+    rule.status !== "rejected"
+      && rule._id !== excludeId
+      && areMatchersEquivalent(getRuleMatcher(rule), matcher)
+  );
+  if (duplicate) throw new Error("A rule with the same filters already exists.");
+}
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -36,15 +88,19 @@ export const create = mutation({
   args: {
     pattern: v.string(),
     field: v.union(v.literal("merchantName"), v.literal("details")),
-    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith")),
+    matchType: matchTypeValidator,
+    caseSensitive: v.optional(v.boolean()),
+    matcher: v.optional(v.any()),
     cat3: v.string(),
     cat2: v.union(v.string(), v.null()),
     cat1: v.union(v.string(), v.null()),
     source: v.union(v.literal("manual"), v.literal("ai")),
   },
   handler: async (ctx, args) => {
+    const normalized = normalizeRulePayload(args);
+    await ensureUniqueRuleMatcher(ctx, normalized.matcher);
     return await ctx.db.insert("rules", {
-      ...args,
+      ...normalized,
       status: args.source === "manual" ? "active" : "candidate",
       createdAt: new Date().toISOString(),
     });
@@ -58,7 +114,9 @@ export const batchCreateCandidates = mutation({
     rules: v.array(v.object({
       pattern: v.string(),
       field: v.union(v.literal("merchantName"), v.literal("details")),
-      matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith")),
+      matchType: matchTypeValidator,
+      caseSensitive: v.optional(v.boolean()),
+      matcher: v.optional(v.any()),
       cat3: v.string(),
       cat2: v.union(v.string(), v.null()),
       cat1: v.union(v.string(), v.null()),
@@ -69,25 +127,25 @@ export const batchCreateCandidates = mutation({
       _id: Id<"rules">;
       pattern: string;
       field: "merchantName" | "details";
-      matchType: "contains" | "exact" | "startsWith";
+      matchType: "contains" | "exact" | "startsWith" | "word" | "regex";
+      caseSensitive?: boolean;
+      matcher: unknown;
       cat3: string;
       cat2: string | null;
       cat1: string | null;
     }> = [];
 
-    for (const rule of rules) {
-      // Skip if an active or candidate rule with the same pattern+field already exists
-      const existing = await ctx.db
-        .query("rules")
-        .withIndex("by_pattern", q => q.eq("pattern", rule.pattern))
-        .filter(q =>
-          q.and(
-            q.eq(q.field("field"), rule.field),
-            q.neq(q.field("status"), "rejected"),
-          )
-        )
-        .first();
-      if (existing) continue;
+    const existingSignatures = new Set(
+      (await ctx.db.query("rules").collect())
+        .filter(rule => rule.status !== "rejected")
+        .map(rule => serializeMatcher(getRuleMatcher(rule))),
+    );
+    const seenInBatch = new Set<string>();
+
+    for (const rawRule of rules) {
+      const rule = normalizeRulePayload(rawRule);
+      const signature = serializeMatcher(rule.matcher);
+      if (existingSignatures.has(signature) || seenInBatch.has(signature)) continue;
 
       const id = await ctx.db.insert("rules", {
         ...rule,
@@ -95,6 +153,7 @@ export const batchCreateCandidates = mutation({
         source: "ai",
         createdAt: new Date().toISOString(),
       });
+      seenInBatch.add(signature);
       created.push({ _id: id, ...rule });
     }
     return created;
@@ -104,6 +163,9 @@ export const batchCreateCandidates = mutation({
 export const approve = mutation({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }) => {
+    const rule = await ctx.db.get(id);
+    if (!rule) return;
+    await ensureUniqueRuleMatcher(ctx, getRuleMatcher(rule), id);
     await ctx.db.patch(id, { status: "active", approvedAt: new Date().toISOString() });
   },
 });
@@ -138,13 +200,17 @@ export const update = mutation({
     id: v.id("rules"),
     pattern: v.string(),
     field: v.union(v.literal("merchantName"), v.literal("details")),
-    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith")),
+    matchType: matchTypeValidator,
+    caseSensitive: v.optional(v.boolean()),
+    matcher: v.optional(v.any()),
     cat3: v.string(),
     cat2: v.union(v.string(), v.null()),
     cat1: v.union(v.string(), v.null()),
   },
   handler: async (ctx, { id, ...fields }) => {
-    await ctx.db.patch(id, fields);
+    const normalized = normalizeRulePayload(fields);
+    await ensureUniqueRuleMatcher(ctx, normalized.matcher, id);
+    await ctx.db.patch(id, normalized);
   },
 });
 
@@ -176,14 +242,15 @@ export const remove = mutation({
 
 function matchesRule(
   tx: { merchantName: string; details: string },
-  rule: { pattern: string; field: string; matchType: string },
+  rule: {
+    pattern?: string;
+    field?: string;
+    matchType?: string;
+    caseSensitive?: boolean;
+    matcher?: unknown;
+  },
 ): boolean {
-  const value = (rule.field === "merchantName" ? tx.merchantName : tx.details) ?? "";
-  const p = rule.pattern.toLowerCase();
-  const v = value.toLowerCase();
-  if (rule.matchType === "exact") return v === p;
-  if (rule.matchType === "startsWith") return v.startsWith(p);
-  return v.includes(p);
+  return matchesTransactionRule(tx as any, rule as any);
 }
 
 /** Apply all active rules to transactions from a specific import. */

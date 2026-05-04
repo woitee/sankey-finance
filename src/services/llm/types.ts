@@ -1,3 +1,5 @@
+import type { RuleMatcher } from '../../rules/matcher';
+
 export interface CategorizationRequest {
   merchantName: string;
   details: string;
@@ -15,7 +17,9 @@ export interface CategorizationResponse {
 export interface RuleSuggestion {
   pattern: string;
   field: 'merchantName' | 'details';
-  matchType: 'contains' | 'exact' | 'startsWith';
+  matchType: 'contains' | 'exact' | 'startsWith' | 'word' | 'regex';
+  caseSensitive?: boolean;
+  matcher?: RuleMatcher | null;
   cat1: string;
   cat2: string;
   cat3: string;

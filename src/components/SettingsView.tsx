@@ -3,6 +3,22 @@ import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 import { getAllCat3Values, getAllCat2Values, getAllCat1Values, resolveCategory } from '../config/categories';
+import {
+  buildLegacyMatcher,
+  describeMatcher,
+  findInvalidRegex,
+  getPrimaryCondition,
+  getRuleMatcher,
+  normalizeMatcher,
+} from '../rules/matcher';
+import type {
+  RuleCondition,
+  RuleField,
+  RuleGroup,
+  RuleGroupOperator,
+  RuleMatchType,
+  RuleMatcher,
+} from '../rules/matcher';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -263,20 +279,41 @@ const MATCH_LABELS: Record<string, string> = {
   contains: 'contains',
   exact: 'equals',
   startsWith: 'starts with',
+  word: 'matches word',
+  regex: 'matches regex',
 };
 const FIELD_LABELS: Record<string, string> = {
   merchantName: 'merchant',
   details: 'details',
 };
 
+const MATCH_OPTIONS: RuleMatchType[] = ['contains', 'exact', 'startsWith', 'word', 'regex'];
+const FIELD_OPTIONS: RuleField[] = ['merchantName', 'details'];
+
+function newCondition(): RuleCondition {
+  return { kind: 'condition', field: 'merchantName', matchType: 'contains', pattern: '', caseSensitive: false };
+}
+
+function newGroup(operator: RuleGroupOperator = 'and'): RuleGroup {
+  return { kind: 'group', operator, conditions: [newCondition()] };
+}
+
+function wrapMatcher(matcher: RuleMatcher, operator: RuleGroupOperator): RuleGroup {
+  return { kind: 'group', operator, conditions: [matcher, newCondition()] };
+}
+
+function matcherHasBlankPattern(matcher: RuleMatcher): boolean {
+  if (matcher.kind === 'condition') return !matcher.pattern.trim();
+  return matcher.conditions.some(matcherHasBlankPattern);
+}
+
 function RuleDescription({ rule }: { rule: any }) {
   const cat2 = rule.cat2 ?? resolveCategory(rule.cat3)?.cat2;
   const cat1 = rule.cat1 ?? resolveCategory(rule.cat3)?.cat1;
+  const matcher = getRuleMatcher(rule);
   return (
     <span style={{ fontSize: 13, color: '#94a3b8' }}>
-      <span style={{ color: '#64748b' }}>{FIELD_LABELS[rule.field]} </span>
-      <span style={{ color: '#64748b' }}>{MATCH_LABELS[rule.matchType]} </span>
-      <span style={{ color: '#cdd6f4', fontWeight: 600 }}>"{rule.pattern}"</span>
+      <span style={{ color: '#cdd6f4', fontWeight: 600 }}>{describeMatcher(matcher)}</span>
       <span style={{ color: '#45475a' }}> → </span>
       {cat1 && <span style={{ color: '#74c7ec', fontSize: 12 }}>{cat1} / </span>}
       {cat2 && <span style={{ color: '#89b4fa', fontSize: 12 }}>{cat2} / </span>}
@@ -288,12 +325,82 @@ function RuleDescription({ rule }: { rule: any }) {
 const CAT1_VALUES = ['MUST', 'WANT', 'MUST/WANT', 'INCOME', 'NOISE', 'TRANSFER'];
 
 interface RuleFormValues {
+  matcher: RuleMatcher;
   pattern: string;
-  field: 'merchantName' | 'details';
-  matchType: 'contains' | 'exact' | 'startsWith';
+  field: RuleField;
+  matchType: RuleMatchType;
+  caseSensitive: boolean;
   cat3: string;
   cat2: string;
   cat1: string;
+}
+
+function MatcherEditor({
+  matcher,
+  onChange,
+  onRemove,
+  isRoot = false,
+}: {
+  matcher: RuleMatcher;
+  onChange: (matcher: RuleMatcher) => void;
+  onRemove?: () => void;
+  isRoot?: boolean;
+}) {
+  const selectStyle: React.CSSProperties = { ...inputStyle, padding: '4px 6px', fontSize: 12 };
+
+  if (matcher.kind === 'condition') {
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select value={matcher.field} onChange={e => onChange({ ...matcher, field: e.target.value as RuleField })} style={selectStyle}>
+          {FIELD_OPTIONS.map(field => <option key={field} value={field}>{FIELD_LABELS[field]}</option>)}
+        </select>
+        <select value={matcher.matchType} onChange={e => onChange({ ...matcher, matchType: e.target.value as RuleMatchType })} style={selectStyle}>
+          {MATCH_OPTIONS.map(matchType => <option key={matchType} value={matchType}>{MATCH_LABELS[matchType]}</option>)}
+        </select>
+        <select value={matcher.caseSensitive ? 'sensitive' : 'insensitive'} onChange={e => onChange({ ...matcher, caseSensitive: e.target.value === 'sensitive' })} style={selectStyle}>
+          <option value="insensitive">ignore case</option>
+          <option value="sensitive">match case</option>
+        </select>
+        <input
+          placeholder={matcher.matchType === 'regex' ? 'regex pattern' : 'pattern'}
+          value={matcher.pattern}
+          onChange={e => onChange({ ...matcher, pattern: e.target.value })}
+          autoFocus={isRoot}
+          style={{ ...inputStyle, flex: 1, minWidth: 180 }}
+        />
+        <button onClick={() => onChange(wrapMatcher(matcher, 'and'))} style={btnStyle('transparent', '#89b4fa', '1px solid #89b4fa33')}>Wrap AND</button>
+        <button onClick={() => onChange(wrapMatcher(matcher, 'or'))} style={btnStyle('transparent', '#f9e2af', '1px solid #f9e2af33')}>Wrap OR</button>
+        {!isRoot && onRemove && <button onClick={onRemove} style={btnStyle('transparent', '#f38ba8', '1px solid #f38ba838')}>Remove</button>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #313244', borderRadius: 8, padding: 10, background: '#11111b' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: '#64748b', letterSpacing: '0.08em' }}>GROUP</span>
+        <select value={matcher.operator} onChange={e => onChange({ ...matcher, operator: e.target.value as RuleGroupOperator })} style={selectStyle}>
+          <option value="and">AND</option>
+          <option value="or">OR</option>
+        </select>
+        <button onClick={() => onChange({ ...matcher, conditions: [...matcher.conditions, newCondition()] })} style={btnStyle('transparent', '#a6e3a1', '1px solid #a6e3a133')}>+ Condition</button>
+        <button onClick={() => onChange({ ...matcher, conditions: [...matcher.conditions, newGroup('and')] })} style={btnStyle('transparent', '#89b4fa', '1px solid #89b4fa33')}>+ Group</button>
+        {!isRoot && onRemove && <button onClick={onRemove} style={btnStyle('transparent', '#f38ba8', '1px solid #f38ba838')}>Remove</button>}
+      </div>
+      {matcher.conditions.map((child, index) => {
+        const remaining = matcher.conditions.filter((_, i) => i !== index);
+        return (
+          <MatcherEditor
+            key={index}
+            matcher={child}
+            onChange={next => onChange({ ...matcher, conditions: matcher.conditions.map((entry, i) => i === index ? next : entry) })}
+            onRemove={() => onChange(normalizeMatcher({ ...matcher, conditions: remaining.length > 0 ? remaining : [newCondition()] }))}
+          />
+        );
+      })}
+      <div style={{ fontSize: 11, color: '#64748b' }}>Parentheses are represented by each nested group.</div>
+    </div>
+  );
 }
 
 function RuleForm({
@@ -307,24 +414,42 @@ function RuleForm({
   onCancel: () => void;
   saveLabel?: string;
 }) {
-  const [pattern, setPattern] = useState(initial?.pattern ?? '');
-  const [field, setField] = useState<'merchantName' | 'details'>(initial?.field ?? 'merchantName');
-  const [matchType, setMatchType] = useState<'contains' | 'exact' | 'startsWith'>(initial?.matchType ?? 'contains');
+  const [matcher, setMatcher] = useState<RuleMatcher>(initial?.matcher ?? buildLegacyMatcher(initial ?? {}));
   const [cat3, setCat3] = useState(initial?.cat3 ?? '');
   const [cat2, setCat2] = useState(initial?.cat2 ?? '');
   const [cat1, setCat1] = useState(initial?.cat1 ?? '');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCat3Change = (val: string) => {
     setCat3(val);
   };
 
-  const canSave = pattern.trim() && cat3.trim() && cat2.trim() && cat1.trim();
+  const normalizedMatcher = normalizeMatcher(matcher);
+  const invalidRegex = findInvalidRegex(normalizedMatcher);
+  const canSave = !matcherHasBlankPattern(normalizedMatcher) && !invalidRegex && cat3.trim() && cat2.trim() && cat1.trim();
 
   const handleSave = async () => {
     if (!canSave) return;
+    setError(null);
     setSaving(true);
-    await onSave({ pattern: pattern.trim(), field, matchType, cat3: cat3.trim(), cat2: cat2.trim(), cat1: cat1.trim() });
+    const primary = getPrimaryCondition(normalizedMatcher);
+    try {
+      await onSave({
+        matcher: normalizedMatcher,
+        pattern: primary.pattern,
+        field: primary.field,
+        matchType: primary.matchType,
+        caseSensitive: primary.caseSensitive ?? false,
+        cat3: cat3.trim(),
+        cat2: cat2.trim(),
+        cat1: cat1.trim(),
+      });
+    } catch (err: any) {
+      setError(String(err?.message ?? err));
+      setSaving(false);
+      return;
+    }
     setSaving(false);
   };
 
@@ -332,19 +457,7 @@ function RuleForm({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: '#13131f', borderRadius: 8, border: '1px solid #1e1e2e' }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={field} onChange={e => setField(e.target.value as any)} style={selectStyle}>
-          <option value="merchantName">merchant</option>
-          <option value="details">details</option>
-        </select>
-        <select value={matchType} onChange={e => setMatchType(e.target.value as any)} style={selectStyle}>
-          <option value="contains">contains</option>
-          <option value="exact">equals</option>
-          <option value="startsWith">starts with</option>
-        </select>
-        <input placeholder="pattern" value={pattern} onChange={e => setPattern(e.target.value)}
-          autoFocus style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
-      </div>
+      <MatcherEditor matcher={matcher} onChange={setMatcher} isRoot />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ color: '#45475a', fontSize: 13 }}>→</span>
         <select value={cat1} onChange={e => setCat1(e.target.value)} style={{ ...selectStyle, width: 90 }}>
@@ -366,6 +479,8 @@ function RuleForm({
           {getAllCat3Values().map(v => <option key={v} value={v} />)}
         </datalist>
       </div>
+      {invalidRegex && <div style={{ color: '#f38ba8', fontSize: 12 }}>{invalidRegex}</div>}
+      {error && <div style={{ color: '#f38ba8', fontSize: 12 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={handleSave} disabled={!canSave || saving}
           style={{ ...btnStyle('#6366f1', '#fff'), opacity: canSave && !saving ? 1 : 0.4 }}>
@@ -405,7 +520,7 @@ function CandidateRules() {
       {candidates.map(rule => editing === rule._id ? (
         <RuleForm
           key={rule._id}
-          initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
+          initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
           saveLabel="Save"
           onSave={async vals => { await updateRule({ id: rule._id, ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null }); setEditing(null); }}
           onCancel={() => setEditing(null)}
@@ -531,7 +646,7 @@ function ActiveRules() {
               {groupRules.map(rule => editing === rule._id ? (
                 <RuleForm
                   key={rule._id}
-                  initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
+                  initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
                   saveLabel="Save"
                   onSave={async vals => { await updateRule({ id: rule._id, ...vals, cat2: vals.cat2 || null, cat1: vals.cat1 || null }); setEditing(null); }}
                   onCancel={() => setEditing(null)}
@@ -600,7 +715,7 @@ export function SettingsView() {
       </SectionCard>
 
       <SectionCard>
-        <SectionHeader title="Active Rules" subtitle="Applied before AI categorization. Rules run in order: exact → startsWith → contains." />
+        <SectionHeader title="Active Rules" subtitle="Applied before AI categorization. Rules can combine nested AND/OR groups, case modes, word matching, and regex." />
         <ActiveRules />
       </SectionCard>
 
