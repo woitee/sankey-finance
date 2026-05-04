@@ -15,10 +15,11 @@ import { DateRangePicker } from './components/DateRangePicker';
 import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
 import { CategorizeModal } from './components/CategorizeModal';
+import { StatementsView } from './components/StatementsView';
 import type { CategorizeResult } from './components/CategorizeModal';
 import { resolveGroups, generateGroupId } from './transforms/groups';
 
-type Tab = 'dashboard' | 'transactions' | 'settings';
+type Tab = 'dashboard' | 'transactions' | 'statements' | 'settings';
 
 type RouteState = {
   tab: Tab;
@@ -95,6 +96,16 @@ function parseRoute(location: Location): RouteState {
     };
   }
 
+  if (pathname === '/statements') {
+    return {
+      tab: 'statements',
+      from,
+      to,
+      txFilter: {},
+      ruleId: null,
+    };
+  }
+
   return {
     tab: 'dashboard',
     from,
@@ -122,6 +133,11 @@ function buildRouteUrl(route: RouteState): string {
     if (route.ruleId) params.set('rule', route.ruleId);
     const search = params.toString();
     return `/settings${search ? `?${search}` : ''}`;
+  }
+
+  if (route.tab === 'statements') {
+    const search = params.toString();
+    return `/statements${search ? `?${search}` : ''}`;
   }
 
   const search = params.toString();
@@ -637,7 +653,7 @@ export default function App() {
           )}
         </div>
           <nav style={{ display: 'flex', gap: 8 }}>
-            {(['dashboard', 'transactions', 'settings'] as Tab[]).map(t => (
+            {(['dashboard', 'transactions', 'statements', 'settings'] as Tab[]).map(t => (
               <button
                 key={t}
                 onClick={() => {
@@ -660,7 +676,13 @@ export default function App() {
                 color: tab === t ? '#fff' : '#94a3b8',
               }}
             >
-              {t === 'dashboard' ? 'Dashboard' : t === 'transactions' ? 'Transactions' : 'Settings'}
+              {t === 'dashboard'
+                ? 'Dashboard'
+                : t === 'transactions'
+                  ? 'Transactions'
+                  : t === 'statements'
+                    ? 'Statements'
+                    : 'Settings'}
             </button>
           ))}
           <button
@@ -859,6 +881,12 @@ export default function App() {
           <div style={{ background: '#181825', borderRadius: 12, padding: 24 }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Settings</h2>
             <SettingsView />
+          </div>
+        )}
+        {tab === 'statements' && (
+          <div style={{ background: '#181825', borderRadius: 12, padding: 24 }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Statements</h2>
+            <StatementsView from={from} to={to} />
           </div>
         )}
       </main>
