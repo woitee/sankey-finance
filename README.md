@@ -56,6 +56,32 @@ Environment variables used by the app:
 - `GOOGLE_API_KEY` - required when `LLM_PROVIDER=google`
 - `TOKEN_ENCRYPTION_KEY` - required for bank token encryption; used by Convex server code and best set with `npx convex env set ...`
 - `VITE_CURRENCY` - optional UI currency override; defaults to `CZK`
+- `VITE_AUTH_PROVIDER` - optional; set to `clerk` to enable authentication (see below)
+- `VITE_CLERK_PUBLISHABLE_KEY` - required when `VITE_AUTH_PROVIDER=clerk`
+- `AUTH_ISSUER_URL` - required when `VITE_AUTH_PROVIDER=clerk`; Clerk OIDC issuer URL for Vite middleware JWT verification
+
+## Authentication (optional)
+
+Auth is **disabled by default** — the app runs wide open, which is fine for local use. To gate the app behind a login:
+
+1. Create a [Clerk](https://clerk.com) application (free tier is fine for personal use)
+2. Add to `.env`:
+   ```
+   VITE_AUTH_PROVIDER=clerk
+   VITE_CLERK_PUBLISHABLE_KEY=pk_...
+   AUTH_ISSUER_URL=https://your-app.clerk.accounts.dev
+   ```
+3. Set the Convex env var so Convex validates the same JWTs:
+   ```bash
+   npx convex env set CLERK_ISSUER_URL https://your-app.clerk.accounts.dev
+   ```
+
+When enabled, this protects:
+- **Frontend** — shows a Clerk sign-in screen; unauthenticated users can't see the app
+- **Vite LLM endpoints** (`/api/categorize`, `/api/parse-statement`) — verified via JWKS (jose)
+- **Convex** — JWTs validated via `convex/auth.config.ts`
+
+The auth layer is pluggable — see `src/auth/types.ts` for the provider interface. To add a new provider (e.g. Auth0), create `src/auth/<name>.tsx` and add a case in `main.tsx` + `vite-auth.ts`.
 
 ## Importing statements
 
@@ -93,12 +119,16 @@ Rules live in Settings → Active Rules. Each rule matches a **pattern** against
 
 ```
 src/
+  auth/             # Pluggable auth layer (none, clerk)
   components/       # React UI (SettingsView, TransactionTable, charts…)
   config/           # Category hierarchy
+  parsers/          # Bank statement parsers (Air Bank, CSOB, LLM fallback)
   services/         # Categorizer, LLM provider
   transforms/       # Sankey builder, summary, grouping
   types/
 convex/             # Backend: schema, queries, mutations, actions
   banks/            # Bank provider registry (extend for live sync)
+vite-llm-plugin.ts  # Vite middleware: /api/categorize, /api/parse-statement
+vite-auth.ts        # Vite middleware: JWT verification (JWKS via jose)
 scripts/            # Python PDF parser
 ```
