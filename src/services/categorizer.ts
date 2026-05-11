@@ -2,12 +2,16 @@ import type { Transaction } from '../types/transaction';
 import { resolveCategory, getAllCat3Values } from '../config/categories';
 import { createLLMProvider } from './llm';
 import type { CategorizationRequest, RuleSuggestion } from './llm';
+import { matchesTransactionRule } from '../rules/matcher';
+import type { RuleLike, RuleMatcher } from '../rules/matcher';
 
-export interface ActiveRule {
+export interface ActiveRule extends RuleLike {
   id?: string;
   pattern: string;
   field: 'merchantName' | 'details';
-  matchType: 'contains' | 'exact' | 'startsWith';
+  matchType: 'contains' | 'exact' | 'startsWith' | 'word' | 'regex';
+  caseSensitive?: boolean;
+  matcher?: RuleMatcher | null;
   cat3: string;
   cat2: string | null;
   cat1: string | null;
@@ -19,12 +23,7 @@ export interface CategorizationResult {
 }
 
 export function matchesRule(tx: Transaction, rule: ActiveRule): boolean {
-  const value = rule.field === 'merchantName' ? tx.merchantName : tx.details;
-  const p = rule.pattern.toLowerCase();
-  const v = (value ?? '').toLowerCase();
-  if (rule.matchType === 'exact') return v === p;
-  if (rule.matchType === 'startsWith') return v.startsWith(p);
-  return v.includes(p);
+  return matchesTransactionRule(tx, rule);
 }
 
 export async function categorizeTransactions(

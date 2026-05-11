@@ -218,6 +218,8 @@ export default function App() {
         pattern: r.pattern,
         field: r.field,
         matchType: r.matchType,
+        caseSensitive: r.caseSensitive,
+        matcher: r.matcher,
         cat3: r.cat3,
         cat2: r.cat2,
         cat1: r.cat1,
@@ -232,6 +234,8 @@ export default function App() {
         pattern: r.pattern,
         field: r.field,
         matchType: r.matchType,
+        caseSensitive: r.caseSensitive,
+        matcher: r.matcher,
         cat3: r.cat3,
         cat2: r.cat2,
         cat1: r.cat1,
@@ -830,10 +834,12 @@ export default function App() {
                 navigateTo({ tab: 'settings', from, to, txFilter, ruleId });
               }}
               onCreateRule={async tx => {
+                const field = tx.merchantName ? 'merchantName' : 'details';
+                const pattern = tx.merchantName || tx.details;
                 const created = await batchCreateCandidates({
                   rules: [{
-                    pattern: tx.merchantName || tx.details,
-                    field: 'merchantName',
+                    pattern,
+                    field,
                     matchType: 'contains',
                     cat3: tx.cat3 || '',
                     cat2: tx.cat2 ?? null,

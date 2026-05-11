@@ -65,6 +65,8 @@ export default defineSchema({
 
   imports: defineTable({
     filename: v.string(),        // original file name
+    fileContentType: v.optional(v.string()),
+    fileStorageId: v.optional(v.string()),
     parserName: v.string(),      // e.g. "Air Bank (Czech Republic)" or "AI (Claude)"
     importedAt: v.string(),      // ISO timestamp
     period: v.string(),          // YYYY-MM from the parsed statement
@@ -86,7 +88,9 @@ export default defineSchema({
     // Matching
     pattern: v.string(),
     field: v.union(v.literal("merchantName"), v.literal("details")),
-    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith")),
+    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("startsWith"), v.literal("word"), v.literal("regex")),
+    caseSensitive: v.optional(v.boolean()),
+    matcher: v.optional(v.any()),
     // Category outcome
     cat3: v.string(),
     cat2: v.union(v.string(), v.null()),
