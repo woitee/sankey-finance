@@ -72,7 +72,11 @@ export default defineSchema({
     period: v.string(),          // YYYY-MM from the parsed statement
     accountNumber: v.string(),
     transactionCount: v.number(),
-  }).index("by_importedAt", ["importedAt"]),
+    fileStorageId: v.optional(v.id("_storage")),
+    fileContentType: v.optional(v.string()),
+  })
+    .index("by_importedAt", ["importedAt"])
+    .index("by_statement_key", ["filename", "period", "accountNumber"]),
 
   statements: defineTable({
     period: v.string(),

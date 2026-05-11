@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
-import { useAction, useMutation } from 'convex/react';
+import { useCallback, useRef, useState } from 'react';
+import { useAction, useMutation, useQuery } from 'convex/react';
+import type { Id } from '../../convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 import { detectParser, PARSERS } from '../parsers/registry';
 import { LlmParser } from '../parsers/llmParser';
@@ -13,6 +14,10 @@ function makeOriginalId(accountNumber: string, period: string, index: number): s
 
 const llmParser = new LlmParser();
 
+function isPdfFile(file: File): boolean {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
 // ── State machine ─────────────────────────────────────────────────────────────
 
 type Phase =
@@ -21,10 +26,15 @@ type Phase =
   | { kind: 'detected';   file: File; parser: BankParser }
   | { kind: 'undetected'; file: File }
   | { kind: 'parsing';    parserName: string }
-  | { kind: 'preview';    statement: ParsedStatement; file: File; parserName: string }
+  | { kind: 'preview';    statement: ParsedStatement; file: File; parserName: string; uploadedFile: UploadedFile }
   | { kind: 'importing' }
   | { kind: 'done';       inserted: number; skipped: number }
   | { kind: 'error';      message: string };
+
+type UploadedFile = {
+  storageId: Id<'_storage'>;
+  contentType: string;
+};
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -54,10 +64,23 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createImport = useMutation(api.imports.create);
+  const generateUploadUrl = useMutation(api.imports.generateUploadUrl);
+  const deleteUploadedFile = useMutation(api.imports.deleteUploadedFile);
   const upsertStatement = useMutation(api.statements.upsert);
   const batchUpsert = useMutation(api.transactions.batchUpsert);
   const ensureAccount = useMutation(api.accounts.ensureExists);
   const applyRulesToImport = useAction(api.rules.applyRulesToImport);
+
+  const duplicateImport = useQuery(
+    api.imports.findDuplicate,
+    phase.kind === 'preview'
+      ? {
+          filename: phase.file.name,
+          period: phase.statement.period,
+          accountNumber: phase.statement.accountNumber,
+        }
+      : 'skip',
+  );
 
   // ── File handling ──────────────────────────────────────────────────────────
 
@@ -75,17 +98,46 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const cleanupUploadedFile = useCallback(async (uploadedFile?: UploadedFile | null) => {
+    if (!uploadedFile) return;
+    await deleteUploadedFile({ storageId: uploadedFile.storageId });
+  }, [deleteUploadedFile]);
+
+  async function uploadFile(file: File): Promise<UploadedFile> {
+    const postUrl = await generateUploadUrl({});
+    const contentType = file.type || (isPdfFile(file) ? 'application/pdf' : 'application/octet-stream');
+    const uploadResponse = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Failed to upload file (${uploadResponse.status})`);
+    }
+
+    const { storageId } = await uploadResponse.json();
+    if (!storageId) {
+      throw new Error('Convex file upload did not return a storage ID.');
+    }
+
+    return { storageId: storageId as Id<'_storage'>, contentType };
+  }
+
   async function runParse(file: File, parser: BankParser) {
     setPhase({ kind: 'parsing', parserName: parser.name });
+    let uploadedFile: UploadedFile | null = null;
     try {
+      uploadedFile = await uploadFile(file);
       const statement = await parser.parse(file);
-      setPhase({ kind: 'preview', statement, file, parserName: parser.name });
+      setPhase({ kind: 'preview', statement, file, parserName: parser.name, uploadedFile });
     } catch (e: any) {
+      await cleanupUploadedFile(uploadedFile);
       setPhase({ kind: 'error', message: String(e?.message ?? e) });
     }
   }
 
-  async function runImport(statement: ParsedStatement, sourceFile: File, parserName: string) {
+  async function runImport(statement: ParsedStatement, sourceFile: File, parserName: string, uploadedFile: UploadedFile) {
     setPhase({ kind: 'importing' });
     try {
       // Create import record first
@@ -95,6 +147,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         period: statement.period,
         accountNumber: statement.accountNumber,
         transactionCount: statement.transactions.length,
+        fileStorageId: uploadedFile.storageId,
+        fileContentType: uploadedFile.contentType,
       });
 
       // Ensure account exists
@@ -150,15 +204,29 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     if (file) handleFile(file);
   }
 
+  async function resetModal() {
+    if (phase.kind === 'preview') {
+      await cleanupUploadedFile(phase.uploadedFile);
+    }
+    setPhase({ kind: 'idle' });
+  }
+
+  async function closeModal() {
+    if (phase.kind === 'preview') {
+      await cleanupUploadedFile(phase.uploadedFile);
+    }
+    onClose();
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={overlay} onClick={e => { if (e.target === e.currentTarget) void closeModal(); }}>
       <div style={card}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Import Statement</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button onClick={() => void closeModal()} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 
         {/* IDLE: drop zone */}
@@ -259,7 +327,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
         {/* PREVIEW */}
         {phase.kind === 'preview' && (() => {
-          const { statement, file, parserName } = phase;
+          const { statement, file, parserName, uploadedFile } = phase;
           return (
             <div>
               <StatusLine icon="✓" text={file.name} color="#a6e3a1" />
@@ -276,6 +344,21 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                 <InfoRow label="Transactions" value={String(statement.transactions.length)} />
                 <InfoRow label="Total income" value={fmt(statement.totalIncome)} />
               </div>
+              {duplicateImport && (
+                <div style={{
+                  background: '#2a1f14',
+                  border: '1px solid #f9e2af',
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  color: '#f9e2af',
+                  fontSize: 13,
+                  marginBottom: 16,
+                  lineHeight: 1.5,
+                }}>
+                  A statement with this file name and parsed statement identity already exists.
+                  Importing will replace the previously stored PDF for this statement.
+                </div>
+              )}
               {statement.transactions.length === 0 ? (
                 <div style={{ color: '#f38ba8', fontSize: 13, marginBottom: 20 }}>
                   No transactions were parsed. The file may not be in the expected format.
@@ -285,11 +368,11 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                 <button
                   style={btn('#6366f1', '#fff', statement.transactions.length === 0)}
                   disabled={statement.transactions.length === 0}
-                  onClick={() => runImport(statement, file, parserName)}
+                  onClick={() => runImport(statement, file, parserName, uploadedFile)}
                 >
                   Import {statement.transactions.length} transactions
                 </button>
-                <button style={btn('transparent', '#64748b')} onClick={() => setPhase({ kind: 'idle' })}>
+                <button style={btn('transparent', '#64748b')} onClick={() => void resetModal()}>
                   Start over
                 </button>
               </div>
@@ -315,7 +398,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               <button style={btn('#6366f1', '#fff')} onClick={() => setPhase({ kind: 'idle' })}>
                 Import another
               </button>
-              <button style={btn('transparent', '#64748b')} onClick={onClose}>
+              <button style={btn('transparent', '#64748b')} onClick={() => void closeModal()}>
                 Close
               </button>
             </div>
@@ -337,7 +420,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               <button style={btn('#313244', '#cdd6f4')} onClick={() => setPhase({ kind: 'idle' })}>
                 Try again
               </button>
-              <button style={btn('transparent', '#64748b')} onClick={onClose}>
+              <button style={btn('transparent', '#64748b')} onClick={() => void closeModal()}>
                 Close
               </button>
             </div>

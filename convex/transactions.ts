@@ -16,6 +16,32 @@ export const byImport = query({
   },
 });
 
+export const inspectReparseConflicts = query({
+  args: {
+    importId: v.id("imports"),
+    originalIds: v.array(v.string()),
+  },
+  handler: async (ctx, { importId, originalIds }) => {
+    const conflictingOriginalIds: string[] = [];
+
+    for (const originalId of originalIds) {
+      const existing = await ctx.db
+        .query("transactions")
+        .withIndex("by_originalId", q => q.eq("originalId", originalId))
+        .first();
+
+      if (existing && existing.importId !== importId) {
+        conflictingOriginalIds.push(originalId);
+      }
+    }
+
+    return {
+      conflictingOriginalIds,
+      conflictCount: conflictingOriginalIds.length,
+    };
+  },
+});
+
 // Query transactions by date range
 export const byDateRange = query({
   args: {
@@ -226,3 +252,71 @@ export const batchDelete = mutation({
   },
 });
 
+export const replaceByImport = mutation({
+  args: {
+    importId: v.id("imports"),
+    conflictMode: v.union(v.literal("overwrite"), v.literal("skip")),
+    transactions: v.array(v.object({
+      originalId: v.string(),
+      period: v.string(),
+      bankAccountNumber: v.optional(v.string()),
+      datePosted: v.string(),
+      dateExecuted: v.string(),
+      type: v.string(),
+      cardholderName: v.string(),
+      accountIdentifier: v.string(),
+      merchantName: v.string(),
+      details: v.string(),
+      amount: v.number(),
+      fees: v.number(),
+    })),
+  },
+  handler: async (ctx, { importId, conflictMode, transactions }) => {
+    const existing = await ctx.db
+      .query("transactions")
+      .withIndex("by_import", q => q.eq("importId", importId))
+      .collect();
+
+    const conflictingOriginalIds = new Set<string>();
+    for (const tx of transactions) {
+      const conflict = await ctx.db
+        .query("transactions")
+        .withIndex("by_originalId", q => q.eq("originalId", tx.originalId))
+        .first();
+
+      if (conflict && conflict.importId !== importId) {
+        conflictingOriginalIds.add(tx.originalId);
+        if (conflictMode === "overwrite") {
+          await ctx.db.delete(conflict._id);
+        }
+      }
+    }
+
+    for (const tx of existing) {
+      await ctx.db.delete(tx._id);
+    }
+
+    let inserted = 0;
+    let skipped = 0;
+    for (const tx of transactions) {
+      if (conflictMode === "skip" && conflictingOriginalIds.has(tx.originalId)) {
+        skipped += 1;
+        continue;
+      }
+
+      await ctx.db.insert("transactions", {
+        ...tx,
+        importId,
+        cat3: null,
+        cat2: null,
+        cat1: null,
+        categorizationSource: null,
+        groupId: null,
+        groupLabel: null,
+      });
+      inserted += 1;
+    }
+
+    return { inserted, skipped, overwritten: conflictMode === "overwrite" ? conflictingOriginalIds.size : 0 };
+  },
+});
