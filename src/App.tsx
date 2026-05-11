@@ -29,14 +29,6 @@ type RouteState = {
   ruleId: string | null;
 };
 
-type RouteState = {
-  tab: Tab;
-  from: string;
-  to: string;
-  txFilter: CategoryFilter;
-  ruleId: string | null;
-};
-
 // Convex document extended with the Convex _id for mutations
 type TxDoc = Transaction & {
   _convexId: Id<'transactions'>;
