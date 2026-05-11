@@ -1,4 +1,5 @@
 import type { BankParser, ParsedStatement } from './types';
+import { authFetch } from '../auth/fetch';
 
 async function fileToText(file: File): Promise<string> {
   if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
@@ -30,7 +31,7 @@ export class LlmParser implements BankParser {
 
   async parse(file: File): Promise<ParsedStatement> {
     const text = await fileToText(file);
-    const res = await fetch('/api/parse-statement', {
+    const res = await authFetch('/api/parse-statement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
