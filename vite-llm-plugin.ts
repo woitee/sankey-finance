@@ -7,6 +7,7 @@ import type { Plugin } from 'vite';
 import type { LanguageModel } from 'ai';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getAllCat2Values } from './src/config/categories';
+import { createVerifier, authMiddleware } from './vite-auth';
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5',
@@ -204,37 +205,46 @@ ${text.slice(0, 60_000)}`,
 }
 
 export function llmPlugin(env: Record<string, string>): Plugin {
+  let verifyAuth: ReturnType<typeof authMiddleware> | null = null;
+
   return {
     name: 'llm-api',
-    configureServer(server) {
-      server.middlewares.use('/api/categorize', async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    async configureServer(server) {
+      const verifier = await createVerifier(env);
+      verifyAuth = authMiddleware(verifier);
+
+      server.middlewares.use('/api/categorize', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (req.method !== 'POST') return next();
-        try {
-          const body = (await readBody(req)) as { requests: CategorizationRequest[]; validCat3Values: string[] };
-          const model = createModel(env);
-          const result = await categorizeBatch(model, body.requests, body.validCat3Values);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        } catch (e: any) {
-          console.error('[llm-api] Error:', e?.message ?? e);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
-        }
+        verifyAuth!(req, res, async () => {
+          try {
+            const body = (await readBody(req)) as { requests: CategorizationRequest[]; validCat3Values: string[] };
+            const model = createModel(env);
+            const result = await categorizeBatch(model, body.requests, body.validCat3Values);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (e: any) {
+            console.error('[llm-api] Error:', e?.message ?? e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
+          }
+        });
       });
 
-      server.middlewares.use('/api/parse-statement', async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      server.middlewares.use('/api/parse-statement', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (req.method !== 'POST') return next();
-        try {
-          const body = (await readBody(req)) as { text: string };
-          const model = createModel(env);
-          const result = await parseStatement(model, body.text);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        } catch (e: any) {
-          console.error('[llm-api] parse-statement error:', e?.message ?? e);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
-        }
+        verifyAuth!(req, res, async () => {
+          try {
+            const body = (await readBody(req)) as { text: string };
+            const model = createModel(env);
+            const result = await parseStatement(model, body.text);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (e: any) {
+            console.error('[llm-api] parse-statement error:', e?.message ?? e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
+          }
+        });
       });
     },
   };

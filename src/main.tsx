@@ -1,11 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import App from './App';
-
-const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
-console.log('[Convex] connecting to:', convexUrl ?? '(VITE_CONVEX_URL not set)');
-const convex = new ConvexReactClient(convexUrl);
+import type { AuthModule } from './auth/types';
 
 const style = document.createElement('style');
 style.textContent = `
@@ -18,10 +14,31 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ConvexProvider client={convex}>
-      <App />
-    </ConvexProvider>
-  </StrictMode>,
-);
+async function mount() {
+  const authProvider = import.meta.env.VITE_AUTH_PROVIDER as string | undefined;
+
+  // Dynamic import keeps unused provider out of the bundle
+  let mod: AuthModule;
+  if (authProvider === 'clerk') {
+    mod = await import('./auth/clerk');
+  } else {
+    mod = await import('./auth/none');
+  }
+
+  const { AppProvider } = mod;
+
+  console.log(
+    `[auth] provider: ${authProvider || 'none'}`,
+    `| Convex: ${import.meta.env.VITE_CONVEX_URL ?? '(not set)'}`,
+  );
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </StrictMode>,
+  );
+}
+
+mount();
