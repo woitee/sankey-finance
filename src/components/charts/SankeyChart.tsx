@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import { SafeEChart } from './SafeEChart';
 import type { SankeyData } from '../../types/chart';
 import { formatCurrency } from '../../utils/currency';
 
@@ -73,7 +73,7 @@ export function SankeyChart({
   };
 
   return (
-    <ReactECharts
+    <SafeEChart
       option={option}
       style={{ height, width: '100%', cursor: onNodeClick ? 'pointer' : undefined }}
       opts={{ renderer: 'canvas' }}

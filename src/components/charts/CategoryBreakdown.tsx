@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import { SafeEChart } from './SafeEChart';
 import type { Transaction } from '../../types/transaction';
 import { formatCurrency } from '../../utils/currency';
 
@@ -95,7 +95,7 @@ export function CategoryBreakdown({ transactions }: { transactions: Transaction[
           </button>
         ))}
       </div>
-      <ReactECharts
+      <SafeEChart
         option={option}
         style={{ height: 400, width: '100%' }}
         opts={{ renderer: 'canvas' }}
