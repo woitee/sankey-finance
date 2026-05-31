@@ -7,6 +7,7 @@ const TYPE_COLORS: Record<string, string> = {
   Savings: '#6dbf7b',
   Deficit: '#f59e0b',
   Income: '#b0b8c8',
+  UNCATEGORIZED: '#9ca3af',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -22,6 +23,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Gifts: '#cca94e',
   Personal: '#8494a7',
   Other: '#7a8899',
+  Uncategorized: '#9ca3af',
 };
 
 export function buildSankeyData(
@@ -47,7 +49,7 @@ export function buildSankeyData(
   };
 
   const incomeTransactions = transactions.filter(t => t.amount > 0);
-  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.type && t.type !== 'INCOME' && t.category);
+  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.type !== 'INCOME');
 
   const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
   const totalExpense = expenseTransactions.reduce((s, t) => s + Math.abs(t.amount), 0);
@@ -75,9 +77,9 @@ export function buildSankeyData(
 
   for (const t of expenseTransactions) {
     const abs = Math.abs(t.amount);
-    const typ = t.type!;
-    const cat = t.category!;
-    const sub = t.subcategory!;
+    const typ = t.type ?? 'UNCATEGORIZED';
+    const cat = t.category ?? 'Uncategorized';
+    const sub = t.subcategory ?? 'uncategorized';
     const isMustWant = typ === 'MUST/WANT';
 
     const splits: Array<[string, number]> = isMustWant
@@ -111,6 +113,7 @@ export function buildSankeyData(
   // Income → MUST / WANT (and Deficit covers the shortfall if overspending)
   const deficit = Math.abs(Math.min(0, balance));
   for (const [typ, total] of Object.entries(typeTotals)) {
+    if (!nodes.has(typ)) addNode(typ, TYPE_COLORS[typ]);
     if (deficit > 0 && totalExpense > 0) {
       const incomeShare = Math.round(total * (totalIncome / totalExpense));
       const deficitShare = total - incomeShare;
