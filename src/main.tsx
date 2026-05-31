@@ -15,11 +15,10 @@ style.textContent = `
 document.head.appendChild(style);
 
 async function mount() {
-  const authProvider = import.meta.env.VITE_AUTH_PROVIDER as string | undefined;
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-  // Dynamic import keeps unused provider out of the bundle
   let mod: AuthModule;
-  if (authProvider === 'clerk') {
+  if (clerkKey) {
     mod = await import('./auth/clerk');
   } else {
     mod = await import('./auth/none');
@@ -28,7 +27,7 @@ async function mount() {
   const { AppProvider } = mod;
 
   console.log(
-    `[auth] provider: ${authProvider || 'none'}`,
+    `[auth] provider: ${clerkKey ? 'clerk' : 'none'}`,
     `| Convex: ${import.meta.env.VITE_CONVEX_URL ?? '(not set)'}`,
   );
 

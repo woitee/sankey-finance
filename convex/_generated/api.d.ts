@@ -19,6 +19,7 @@ import type * as http from "../http.js";
 import type * as imports from "../imports.js";
 import type * as integrations from "../integrations.js";
 import type * as jobs from "../jobs.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as lib_crypto from "../lib/crypto.js";
 import type * as llm from "../llm.js";
 import type * as rules from "../rules.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   imports: typeof imports;
   integrations: typeof integrations;
   jobs: typeof jobs;
+  "lib/auth": typeof lib_auth;
   "lib/crypto": typeof lib_crypto;
   llm: typeof llm;
   rules: typeof rules;

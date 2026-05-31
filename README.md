@@ -35,13 +35,11 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 npm install
 
 # Configure environment
-cp .env.example .env
-# Fill in VITE_CONVEX_URL and VITE_CONVEX_SITE_URL from your Convex dashboard
+cp .env.example .env.local
+# Fill in VITE_CONVEX_URL, VITE_CONVEX_SITE_URL, and any API keys
 
-# Set Convex server env vars (at minimum the LLM API key for your provider):
-npx convex env set ANTHROPIC_API_KEY sk-ant-...
-# Optional: bank token encryption key (needed for bank sync feature)
-npx convex env set TOKEN_ENCRYPTION_KEY $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+# Push server-side env vars to Convex (reads non-VITE_ vars from .env.local)
+npm run env:push
 
 # Start everything (Convex + frontend)
 npm start            # http://localhost:5173
@@ -51,39 +49,43 @@ npx convex dev
 npm run dev
 ```
 
-### Frontend environment variables (`.env`)
+### Environment variables (`.env.local`)
 
-- `VITE_CONVEX_URL` - required; frontend Convex deployment URL
-- `VITE_CONVEX_SITE_URL` - required for bank OAuth from the frontend
-- `VITE_CURRENCY` - optional UI currency override; defaults to `CZK`
-- `VITE_AUTH_PROVIDER` - optional; set to `clerk` to enable authentication (see below)
-- `VITE_CLERK_PUBLISHABLE_KEY` - required when `VITE_AUTH_PROVIDER=clerk`
+All config lives in `.env.local`. Variables prefixed with `VITE_` are used by the frontend (bundled into the browser). Everything else is server-side and gets pushed to Convex with `npm run env:push`.
 
-### Convex environment variables (`npx convex env set` / `npx convex env list`)
-
-- `ANTHROPIC_API_KEY` - required when `LLM_PROVIDER=anthropic` (default)
-- `OPENAI_API_KEY` - required when `LLM_PROVIDER=openai`
-- `GOOGLE_API_KEY` - required when `LLM_PROVIDER=google`
-- `LLM_PROVIDER` - optional; one of `anthropic`, `openai`, `google` (defaults to `anthropic`)
-- `LLM_MODEL` - optional; defaults depend on `LLM_PROVIDER`
-- `TOKEN_ENCRYPTION_KEY` - required for bank token encryption
-- `CLERK_ISSUER_URL` - required when `VITE_AUTH_PROVIDER=clerk`
-- `CONVEX_SITE_URL` - optional; `convex/bankAuth.ts` accepts either this or `VITE_CONVEX_SITE_URL`
+| Variable | Side | Required | Description |
+|----------|------|----------|-------------|
+| `VITE_CONVEX_URL` | frontend | yes | Convex deployment URL |
+| `VITE_CONVEX_SITE_URL` | frontend | for bank OAuth | Convex HTTP actions URL |
+| `VITE_CURRENCY` | frontend | no | UI currency symbol (default: `CZK`) |
+| `AUTH_PROVIDER` | server | for auth | Set to `clerk` to enforce backend auth |
+| `VITE_CLERK_PUBLISHABLE_KEY` | frontend | for auth | Clerk publishable key (`pk_...`) |
+| `CLERK_ISSUER_URL` | server | for auth | Clerk issuer URL |
+| `ANTHROPIC_API_KEY` | server | for LLM | Anthropic API key (default provider) |
+| `OPENAI_API_KEY` | server | for LLM | OpenAI API key |
+| `GOOGLE_API_KEY` | server | for LLM | Google AI API key |
+| `LLM_PROVIDER` | server | no | `anthropic` (default), `openai`, or `google` |
+| `LLM_MODEL` | server | no | Model override |
+| `TOKEN_ENCRYPTION_KEY` | server | for bank sync | AES-256-GCM key (64 hex chars) |
 
 ## Authentication (optional)
 
 Auth is **disabled by default** — the app runs wide open, which is fine for local use. To gate the app behind a login:
 
 1. Create a [Clerk](https://clerk.com) application (free tier is fine for personal use)
-2. Add to `.env`:
+2. In the Clerk Dashboard, activate the **Convex** integration (JWT Templates → Convex, or Integrations → Convex). Without this, Clerk won't issue JWTs that Convex can validate.
+3. Add all three lines to `.env.local`:
    ```
-   VITE_AUTH_PROVIDER=clerk
+   AUTH_PROVIDER=clerk
    VITE_CLERK_PUBLISHABLE_KEY=pk_...
+   CLERK_ISSUER_URL=https://your-app.clerk.accounts.dev
    ```
-3. Set the Convex env var so Convex validates the same JWTs:
+4. Push the server-side var to Convex:
    ```bash
-   npx convex env set CLERK_ISSUER_URL https://your-app.clerk.accounts.dev
+   npm run env:push
    ```
+
+Auth is derived from these variables — no separate "enable auth" flag. Remove both lines to go back to open mode.
 
 When enabled, this protects:
 - **Frontend** — shows a Clerk sign-in screen; unauthenticated users can't see the app
