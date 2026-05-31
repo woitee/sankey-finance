@@ -4,6 +4,10 @@
  */
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const convexBin = require.resolve("convex/bin/main.js");
 
 const SKIP_PREFIXES = ["VITE_"];
 const SKIP_EXACT = new Set(["CONVEX_DEPLOYMENT"]);
@@ -42,7 +46,7 @@ console.log();
 
 for (const { key, value } of vars) {
   try {
-    execFileSync("npx", ["convex", "env", "set", key, value], {
+    execFileSync(process.execPath, [convexBin, "env", "set", key, value], {
       stdio: "inherit",
     });
   } catch {
