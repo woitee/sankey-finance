@@ -5,9 +5,12 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const convexBin = require.resolve("convex/bin/main.js");
+const convexPkgPath = require.resolve("convex/package.json");
+const convexPkg = JSON.parse(readFileSync(convexPkgPath, "utf-8"));
+const convexBin = path.join(path.dirname(convexPkgPath), convexPkg.bin.convex);
 
 const SKIP_PREFIXES = ["VITE_"];
 const SKIP_EXACT = new Set(["CONVEX_DEPLOYMENT"]);
