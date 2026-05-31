@@ -28,8 +28,8 @@ export default defineSchema({
     dateExecuted: v.string(),
 
     // Transaction details
+    type: v.string(),
     transactionType: v.optional(v.string()),
-    type: v.optional(v.union(v.string(), v.null())),
     cardholderName: v.string(),
     accountIdentifier: v.string(),
     merchantName: v.string(),
@@ -38,11 +38,11 @@ export default defineSchema({
     fees: v.number(),
 
     // Categorization (transition: old cat1/cat2/cat3 → type/category/subcategory)
+    cat3: v.union(v.string(), v.null()),
+    cat2: v.union(v.string(), v.null()),
+    cat1: v.union(v.string(), v.null()),
     subcategory: v.optional(v.union(v.string(), v.null())),
     category: v.optional(v.union(v.string(), v.null())),
-    cat3: v.optional(v.union(v.string(), v.null())),
-    cat2: v.optional(v.union(v.string(), v.null())),
-    cat1: v.optional(v.union(v.string(), v.null())),
     categorizationSource: v.union(
       v.literal("rule"),
       v.literal("unverified_rule"),
@@ -98,12 +98,12 @@ export default defineSchema({
     caseSensitive: v.optional(v.boolean()),
     matcher: v.optional(v.any()),
     // Category outcome (transition: old cat1/cat2/cat3 → type/category/subcategory)
+    cat3: v.string(),
+    cat2: v.union(v.string(), v.null()),
+    cat1: v.union(v.string(), v.null()),
     subcategory: v.optional(v.string()),
     category: v.optional(v.union(v.string(), v.null())),
     type: v.optional(v.union(v.string(), v.null())),
-    cat3: v.optional(v.string()),
-    cat2: v.optional(v.union(v.string(), v.null())),
-    cat1: v.optional(v.union(v.string(), v.null())),
     // Workflow
     status: v.union(v.literal("active"), v.literal("candidate"), v.literal("rejected")),
     source: v.union(v.literal("manual"), v.literal("ai")),
