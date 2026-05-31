@@ -1,9 +1,8 @@
 /**
  * Convex auth configuration.
  *
- * When CLERK_ISSUER_URL is set as a Convex environment variable
- * (`npx convex env set CLERK_ISSUER_URL <url>`), Convex will validate
- * Clerk JWTs attached to client requests.
+ * When CLERK_ISSUER_URL is set (add to .env.local, then `npm run env:push`),
+ * Convex will validate Clerk JWTs attached to client requests.
  *
  * When the variable is absent, the providers array is empty and Convex
  * runs without authentication — identical to not having this file.

@@ -2,8 +2,9 @@
  * AES-256-GCM encryption helpers for storing sensitive tokens in the DB.
  *
  * Key is read from the TOKEN_ENCRYPTION_KEY Convex environment variable.
- * Set it once with:
- *   npx convex env set TOKEN_ENCRYPTION_KEY $(openssl rand -hex 32)
+ * Set it once in .env.local:
+ *   TOKEN_ENCRYPTION_KEY=<64 hex chars>
+ * Then run: npm run env:push
  *
  * Ciphertext format stored in DB:  "<hex_iv>:<hex_ciphertext>:<hex_tag>"
  * All operations are done with the Web Crypto API (available in Convex runtime).

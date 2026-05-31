@@ -6,7 +6,7 @@
  *   VITE_CLERK_PUBLISHABLE_KEY — Clerk publishable key (pk_...)
  *   VITE_CONVEX_URL            — Convex deployment URL
  *
- * Convex env var (set via `npx convex env set`):
+ * Convex env var (add to .env.local, then `npm run env:push`):
  *   CLERK_ISSUER_URL — e.g. https://your-app.clerk.accounts.dev
  */
 import { ClerkProvider, SignIn, useAuth, useUser } from '@clerk/clerk-react';
