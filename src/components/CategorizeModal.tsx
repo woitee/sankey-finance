@@ -5,7 +5,7 @@ import type { ActiveRule } from '../services/categorizer';
 import { categorizeTransactions, matchesRule } from '../services/categorizer';
 import { createLLMProvider } from '../services/llm';
 import type { RuleSuggestion } from '../services/llm';
-import { getAllCat3Values } from '../config/categories';
+import { getAllSubcategoryValues } from '../config/categories';
 
 // Inject keyframe animations once
 const STYLE_ID = 'categorize-modal-styles';
@@ -94,13 +94,13 @@ function computeDryRunCounts(
   let skipped = 0;
 
   for (const tx of transactions) {
-    if (tx.cat3) { alreadyCategorized++; continue; }
+    if (tx.subcategory) { alreadyCategorized++; continue; }
 
     // Active rules
     if (activeRules.some(r => matchesRule(tx, r))) { byRule++; continue; }
 
     // Auto-categorize income
-    if (tx.amount > 0 && (tx.type === 'prichozi_uhrada' || tx.type === 'odmena_unity' || tx.type === 'vraceni_penez')) {
+    if (tx.amount > 0 && (tx.transactionType === 'prichozi_uhrada' || tx.transactionType === 'odmena_unity' || tx.transactionType === 'vraceni_penez')) {
       byRule++; continue;
     }
 
@@ -172,9 +172,9 @@ export function CategorizeModal({
       // Step 2: collect LLM queue (still uncategorized, negative amounts)
       const queue = finalTxs
         .map((tx, i) => ({ tx, i }))
-        .filter(({ tx }) => !tx.cat3 && tx.amount < 0);
+        .filter(({ tx }) => !tx.subcategory && tx.amount < 0);
 
-      const validCat3 = getAllCat3Values();
+      const validSubcategories = getAllSubcategoryValues();
       const provider = createLLMProvider(convex);
       const allRuleSuggestions: RuleSuggestion[] = [];
 
@@ -185,7 +185,7 @@ export function CategorizeModal({
           merchantName: tx.merchantName,
           details: tx.details,
           amount: tx.amount,
-          transactionType: tx.type,
+          transactionType: tx.transactionType,
         }));
 
         const batchStart = Date.now();
@@ -205,7 +205,7 @@ export function CategorizeModal({
 
         let batchResult;
         try {
-          batchResult = await provider.categorize(requests, validCat3);
+          batchResult = await provider.categorize(requests, validSubcategories);
         } catch {
           clearTick();
           batchesRef.current = batchesRef.current.map((bs, i) =>
@@ -213,7 +213,7 @@ export function CategorizeModal({
           );
           setPhase({ kind: 'running', batches: [...batchesRef.current] });
           // Continue with fallback (uncategorized)
-          batchResult = { responses: requests.map(() => ({ cat1: 'WANT', cat2: 'Other', cat3: 'uncategorized', confidence: 0 })), ruleSuggestions: [] };
+          batchResult = { responses: requests.map(() => ({ type: 'WANT', category: 'Other', subcategory: 'uncategorized', confidence: 0 })), ruleSuggestions: [] };
         }
 
         clearTick();
@@ -221,12 +221,12 @@ export function CategorizeModal({
 
         // Apply results
         batchSlice.forEach(({ i }, j) => {
-          const { cat1, cat2, cat3 } = batchResult.responses[j];
+          const { type, category, subcategory } = batchResult.responses[j];
           finalTxs[i] = {
             ...finalTxs[i],
-            cat3,
-            cat2: cat2 ?? 'Other',
-            cat1: cat1 ?? 'WANT',
+            subcategory,
+            category: category ?? 'Other',
+            type: type ?? 'WANT',
             categorizationSource: 'llm',
           };
         });

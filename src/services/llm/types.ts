@@ -8,9 +8,9 @@ export interface CategorizationRequest {
 }
 
 export interface CategorizationResponse {
-  cat1: string;
-  cat2: string;
-  cat3: string;
+  type: string;
+  category: string;
+  subcategory: string;
   confidence: number;
 }
 
@@ -20,9 +20,9 @@ export interface RuleSuggestion {
   matchType: 'contains' | 'exact' | 'startsWith' | 'word' | 'regex';
   caseSensitive?: boolean;
   matcher?: RuleMatcher | null;
-  cat1: string;
-  cat2: string;
-  cat3: string;
+  type: string;
+  category: string;
+  subcategory: string;
 }
 
 export interface CategorizationResult {
@@ -34,6 +34,6 @@ export interface LLMProvider {
   name: string;
   categorize(
     requests: CategorizationRequest[],
-    validCat3Values: string[],
+    validSubcategoryValues: string[],
   ): Promise<CategorizationResult>;
 }

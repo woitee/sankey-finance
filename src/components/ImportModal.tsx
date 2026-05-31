@@ -174,7 +174,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         bankAccountNumber: statement.accountNumber || undefined,
         datePosted: tx.datePosted,
         dateExecuted: tx.dateExecuted,
-        type: tx.type,
+        transactionType: tx.type,
         cardholderName: tx.cardholderName,
         accountIdentifier: tx.accountIdentifier,
         merchantName: tx.merchantName,

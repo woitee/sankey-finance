@@ -7,7 +7,7 @@ export class ConvexProvider implements LLMProvider {
 
   constructor(private client: ConvexReactClient) {}
 
-  async categorize(requests: CategorizationRequest[], validCat3Values: string[]): Promise<CategorizationResult> {
-    return await this.client.action(api.llm.categorize, { requests, validCat3Values });
+  async categorize(requests: CategorizationRequest[], validSubcategoryValues: string[]): Promise<CategorizationResult> {
+    return await this.client.action(api.llm.categorize, { requests, validSubcategoryValues });
   }
 }

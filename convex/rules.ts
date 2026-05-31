@@ -91,9 +91,9 @@ export const create = mutation({
     matchType: matchTypeValidator,
     caseSensitive: v.optional(v.boolean()),
     matcher: v.optional(v.any()),
-    cat3: v.string(),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    subcategory: v.string(),
+    category: v.union(v.string(), v.null()),
+    type: v.union(v.string(), v.null()),
     source: v.union(v.literal("manual"), v.literal("ai")),
   },
   handler: async (ctx, args) => {
@@ -117,9 +117,9 @@ export const batchCreateCandidates = mutation({
       matchType: matchTypeValidator,
       caseSensitive: v.optional(v.boolean()),
       matcher: v.optional(v.any()),
-      cat3: v.string(),
-      cat2: v.union(v.string(), v.null()),
-      cat1: v.union(v.string(), v.null()),
+      subcategory: v.string(),
+      category: v.union(v.string(), v.null()),
+      type: v.union(v.string(), v.null()),
     })),
   },
   handler: async (ctx, { rules }) => {
@@ -130,9 +130,9 @@ export const batchCreateCandidates = mutation({
       matchType: "contains" | "exact" | "startsWith" | "word" | "regex";
       caseSensitive?: boolean;
       matcher: unknown;
-      cat3: string;
-      cat2: string | null;
-      cat1: string | null;
+      subcategory: string;
+      category: string | null;
+      type: string | null;
     }> = [];
 
     const existingSignatures = new Set(
@@ -203,9 +203,9 @@ export const update = mutation({
     matchType: matchTypeValidator,
     caseSensitive: v.optional(v.boolean()),
     matcher: v.optional(v.any()),
-    cat3: v.string(),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    subcategory: v.string(),
+    category: v.union(v.string(), v.null()),
+    type: v.union(v.string(), v.null()),
   },
   handler: async (ctx, { id, ...fields }) => {
     const normalized = normalizeRulePayload(fields);
@@ -269,11 +269,11 @@ export const applyRulesToImport = action({
       const matched = rules.find(r => matchesRule(tx, r));
       if (!matched) continue;
 
-      if (tx.ruleId === matched._id && tx.categorizationSource === "rule" && tx.cat3 === matched.cat3 && tx.cat1 === matched.cat1 && tx.cat2 === matched.cat2) continue;
+      if (tx.ruleId === matched._id && tx.categorizationSource === "rule" && tx.subcategory === matched.subcategory && tx.type === matched.type && tx.category === matched.category) continue;
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: matched.cat3, cat2: matched.cat2, cat1: matched.cat1,
+        subcategory: matched.subcategory, category: matched.category, type: matched.type,
         categorizationSource: "rule",
         ruleId: matched._id,
       });
@@ -300,12 +300,11 @@ export const applyAllRules = action({
       const matched = rules.find(r => matchesRule(tx, r));
       if (!matched) continue;
 
-      // Already stamped with this exact rule and correct category — nothing to do
-      if (tx.ruleId === matched._id && tx.categorizationSource === "rule" && tx.cat3 === matched.cat3 && tx.cat1 === matched.cat1 && tx.cat2 === matched.cat2) continue;
+      if (tx.ruleId === matched._id && tx.categorizationSource === "rule" && tx.subcategory === matched.subcategory && tx.type === matched.type && tx.category === matched.category) continue;
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: matched.cat3, cat2: matched.cat2, cat1: matched.cat1,
+        subcategory: matched.subcategory, category: matched.category, type: matched.type,
         categorizationSource: "rule",
         ruleId: matched._id,
       });
@@ -334,9 +333,9 @@ export const applyToTransactions = action({
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: rule.cat3,
-        cat2: rule.cat2,
-        cat1: rule.cat1,
+        subcategory: rule.subcategory,
+        category: rule.category,
+        type: rule.type,
         categorizationSource: "rule",
         ruleId: id,
       });

@@ -1,7 +1,7 @@
 import type { Transaction } from '../types/transaction';
 import type { SankeyData, SankeyNode, SankeyLink } from '../types/chart';
 
-const CAT1_COLORS: Record<string, string> = {
+const TYPE_COLORS: Record<string, string> = {
   MUST: '#e87461',
   WANT: '#6a9fdb',
   Savings: '#6dbf7b',
@@ -9,7 +9,7 @@ const CAT1_COLORS: Record<string, string> = {
   Income: '#b0b8c8',
 };
 
-const CAT2_COLORS: Record<string, string> = {
+const CATEGORY_COLORS: Record<string, string> = {
   Living: '#cf7a6e',
   Food: '#d4976a',
   Health: '#c47a8a',
@@ -47,63 +47,62 @@ export function buildSankeyData(
   };
 
   const incomeTransactions = transactions.filter(t => t.amount > 0);
-  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.cat1 && t.cat1 !== 'INCOME' && t.cat2);
+  const expenseTransactions = transactions.filter(t => t.amount < 0 && t.type && t.type !== 'INCOME' && t.category);
 
   const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
   const totalExpense = expenseTransactions.reduce((s, t) => s + Math.abs(t.amount), 0);
   const balance = totalIncome - totalExpense;
 
-  addNode('Income', CAT1_COLORS.Income);
-  addNode('MUST', CAT1_COLORS.MUST);
-  addNode('WANT', CAT1_COLORS.WANT);
+  addNode('Income', TYPE_COLORS.Income);
+  addNode('MUST', TYPE_COLORS.MUST);
+  addNode('WANT', TYPE_COLORS.WANT);
 
   if (balance > 0) {
-    addNode('Savings', CAT1_COLORS.Savings);
+    addNode('Savings', TYPE_COLORS.Savings);
     addLink('Income', 'Savings', balance);
   }
 
   if (balance < 0) {
-    addNode('Deficit', CAT1_COLORS.Deficit);
+    addNode('Deficit', TYPE_COLORS.Deficit);
   }
 
-  // Aggregate by cat1 → cat2 → cat3
-  const cat1Totals: Record<string, number> = {};
-  const cat2Groups: Record<string, Record<string, number>> = {};
-  const cat3Groups: Record<string, Record<string, number>> = {};
-  // Track how much of each (splitC1→c2) and (c2→c3) link came from MUST/WANT transactions
-  const mustWantCat2: Record<string, Record<string, number>> = {};
-  const mustWantCat3: Record<string, Record<string, number>> = {};
+  // Aggregate by type → category → subcategory
+  const typeTotals: Record<string, number> = {};
+  const categoryGroups: Record<string, Record<string, number>> = {};
+  const subcategoryGroups: Record<string, Record<string, number>> = {};
+  const mustWantCategory: Record<string, Record<string, number>> = {};
+  const mustWantSubcategory: Record<string, Record<string, number>> = {};
 
   for (const t of expenseTransactions) {
     const abs = Math.abs(t.amount);
-    const c1 = t.cat1!;
-    const c2 = t.cat2!;
-    const c3 = t.cat3!;
-    const isMustWant = c1 === 'MUST/WANT';
+    const typ = t.type!;
+    const cat = t.category!;
+    const sub = t.subcategory!;
+    const isMustWant = typ === 'MUST/WANT';
 
     const splits: Array<[string, number]> = isMustWant
       ? [['MUST', abs / 2], ['WANT', abs / 2]]
-      : [[c1, abs]];
+      : [[typ, abs]];
 
-    for (const [splitC1, splitAbs] of splits) {
-      cat1Totals[splitC1] = (cat1Totals[splitC1] ?? 0) + splitAbs;
+    for (const [splitType, splitAbs] of splits) {
+      typeTotals[splitType] = (typeTotals[splitType] ?? 0) + splitAbs;
 
-      if (!cat2Groups[splitC1]) cat2Groups[splitC1] = {};
-      cat2Groups[splitC1][c2] = (cat2Groups[splitC1][c2] ?? 0) + splitAbs;
+      if (!categoryGroups[splitType]) categoryGroups[splitType] = {};
+      categoryGroups[splitType][cat] = (categoryGroups[splitType][cat] ?? 0) + splitAbs;
 
       if (isMustWant) {
-        if (!mustWantCat2[splitC1]) mustWantCat2[splitC1] = {};
-        mustWantCat2[splitC1][c2] = (mustWantCat2[splitC1][c2] ?? 0) + splitAbs;
+        if (!mustWantCategory[splitType]) mustWantCategory[splitType] = {};
+        mustWantCategory[splitType][cat] = (mustWantCategory[splitType][cat] ?? 0) + splitAbs;
       }
 
-      if (showCat3 && c3) {
-        const cat2Key = `${splitC1}\0${c2}`;
-        if (!cat3Groups[cat2Key]) cat3Groups[cat2Key] = {};
-        cat3Groups[cat2Key][c3] = (cat3Groups[cat2Key][c3] ?? 0) + splitAbs;
+      if (showCat3 && sub) {
+        const catKey = `${splitType}\0${cat}`;
+        if (!subcategoryGroups[catKey]) subcategoryGroups[catKey] = {};
+        subcategoryGroups[catKey][sub] = (subcategoryGroups[catKey][sub] ?? 0) + splitAbs;
 
         if (isMustWant) {
-          if (!mustWantCat3[cat2Key]) mustWantCat3[cat2Key] = {};
-          mustWantCat3[cat2Key][c3] = (mustWantCat3[cat2Key][c3] ?? 0) + splitAbs;
+          if (!mustWantSubcategory[catKey]) mustWantSubcategory[catKey] = {};
+          mustWantSubcategory[catKey][sub] = (mustWantSubcategory[catKey][sub] ?? 0) + splitAbs;
         }
       }
     }
@@ -111,41 +110,39 @@ export function buildSankeyData(
 
   // Income → MUST / WANT (and Deficit covers the shortfall if overspending)
   const deficit = Math.abs(Math.min(0, balance));
-  for (const [c1, total] of Object.entries(cat1Totals)) {
+  for (const [typ, total] of Object.entries(typeTotals)) {
     if (deficit > 0 && totalExpense > 0) {
-      // Split each cat1 proportionally between Income and Deficit
       const incomeShare = Math.round(total * (totalIncome / totalExpense));
       const deficitShare = total - incomeShare;
-      addLink('Income', c1, incomeShare);
-      addLink('Deficit', c1, deficitShare);
+      addLink('Income', typ, incomeShare);
+      addLink('Deficit', typ, deficitShare);
     } else {
-      addLink('Income', c1, total);
+      addLink('Income', typ, total);
     }
   }
 
-  // MUST/WANT → cat2
-  for (const [c1, cat2Map] of Object.entries(cat2Groups)) {
-    for (const [c2, total] of Object.entries(cat2Map)) {
-      addNode(c2, CAT2_COLORS[c2]);
-      addLink(c1, c2, total, mustWantCat2[c1]?.[c2] ?? 0);
+  // MUST/WANT → category
+  for (const [typ, catMap] of Object.entries(categoryGroups)) {
+    for (const [cat, total] of Object.entries(catMap)) {
+      addNode(cat, CATEGORY_COLORS[cat]);
+      addLink(typ, cat, total, mustWantCategory[typ]?.[cat] ?? 0);
     }
   }
 
-  // cat2 → cat3 (after all cat1/cat2 nodes are registered, so we can detect cycles)
+  // category → subcategory
   if (showCat3) {
     const upstreamNodes = new Set(nodes.keys());
-    for (const [c1, cat2Map] of Object.entries(cat2Groups)) {
-      for (const [c2] of Object.entries(cat2Map)) {
-        const cat2Key = `${c1}\0${c2}`;
-        const c3Map = cat3Groups[cat2Key];
-        if (c3Map) {
-          for (const [c3, c3Total] of Object.entries(c3Map)) {
-            if (upstreamNodes.has(c3)) continue; // would create a cycle
-            addNode(c3);
-            // Sum mustWant from both MUST and WANT sides for the same c2→c3 link
-            const mwFromMust = mustWantCat3[`MUST\0${c2}`]?.[c3] ?? 0;
-            const mwFromWant = mustWantCat3[`WANT\0${c2}`]?.[c3] ?? 0;
-            addLink(c2, c3, c3Total, mwFromMust + mwFromWant);
+    for (const [typ, catMap] of Object.entries(categoryGroups)) {
+      for (const [cat] of Object.entries(catMap)) {
+        const catKey = `${typ}\0${cat}`;
+        const subMap = subcategoryGroups[catKey];
+        if (subMap) {
+          for (const [sub, subTotal] of Object.entries(subMap)) {
+            if (upstreamNodes.has(sub)) continue;
+            addNode(sub);
+            const mwFromMust = mustWantSubcategory[`MUST\0${cat}`]?.[sub] ?? 0;
+            const mwFromWant = mustWantSubcategory[`WANT\0${cat}`]?.[sub] ?? 0;
+            addLink(cat, sub, subTotal, mwFromMust + mwFromWant);
           }
         }
       }

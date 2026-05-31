@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
-import { getAllCat3Values, getAllCat2Values, getAllCat1Values, resolveCategory } from '../config/categories';
+import { getAllSubcategoryValues, getAllCategoryValues, getAllTypeValues, resolveCategory } from '../config/categories';
 import {
   buildLegacyMatcher,
   describeMatcher,
@@ -324,9 +324,9 @@ function toLegacyRulePayload(values: RuleFormValues) {
     pattern: values.pattern,
     field: values.field,
     matchType: values.matchType,
-    cat3: values.cat3,
-    cat2: values.cat2 || null,
-    cat1: values.cat1 || null,
+    subcategory: values.subcategory,
+    category: values.category || null,
+    type: values.type || null,
   };
 }
 
@@ -335,7 +335,7 @@ async function mutateRuleWithCompatibility(
   values: RuleFormValues,
   extras: Record<string, unknown> = {},
 ) {
-  const fullPayload = { ...values, ...extras, cat2: values.cat2 || null, cat1: values.cat1 || null };
+  const fullPayload = { ...values, ...extras, category: values.category || null, type: values.type || null };
   if (isLegacyCompatibleMatcher(values.matcher)) {
     return await mutate({ ...toLegacyRulePayload(values), ...extras });
   }
@@ -348,16 +348,16 @@ async function mutateRuleWithCompatibility(
 }
 
 function RuleDescription({ rule }: { rule: any }) {
-  const cat2 = rule.cat2 ?? resolveCategory(rule.cat3)?.cat2;
-  const cat1 = rule.cat1 ?? resolveCategory(rule.cat3)?.cat1;
+  const category = rule.category ?? resolveCategory(rule.subcategory)?.category;
+  const type = rule.type ?? resolveCategory(rule.subcategory)?.type;
   const matcher = getRuleMatcher(rule);
   return (
     <span style={{ fontSize: 13, color: '#94a3b8' }}>
       <span style={{ color: '#cdd6f4', fontWeight: 600 }}>{describeMatcher(matcher)}</span>
       <span style={{ color: '#45475a' }}> → </span>
-      {cat1 && <span style={{ color: '#74c7ec', fontSize: 12 }}>{cat1} / </span>}
-      {cat2 && <span style={{ color: '#89b4fa', fontSize: 12 }}>{cat2} / </span>}
-      <span style={{ color: '#a6e3a1', fontWeight: 600 }}>{rule.cat3}</span>
+      {type && <span style={{ color: '#74c7ec', fontSize: 12 }}>{type} / </span>}
+      {category && <span style={{ color: '#89b4fa', fontSize: 12 }}>{category} / </span>}
+      <span style={{ color: '#a6e3a1', fontWeight: 600 }}>{rule.subcategory}</span>
     </span>
   );
 }
@@ -370,9 +370,9 @@ interface RuleFormValues {
   field: RuleField;
   matchType: RuleMatchType;
   caseSensitive: boolean;
-  cat3: string;
-  cat2: string;
-  cat1: string;
+  subcategory: string;
+  category: string;
+  type: string;
 }
 
 function MatcherEditor({
@@ -455,19 +455,19 @@ function RuleForm({
   saveLabel?: string;
 }) {
   const [matcher, setMatcher] = useState<RuleMatcher>(initial?.matcher ?? buildLegacyMatcher(initial ?? {}));
-  const [cat3, setCat3] = useState(initial?.cat3 ?? '');
-  const [cat2, setCat2] = useState(initial?.cat2 ?? '');
-  const [cat1, setCat1] = useState(initial?.cat1 ?? '');
+  const [subcategory, setSubcategory] = useState(initial?.subcategory ?? '');
+  const [category, setCategory] = useState(initial?.category ?? '');
+  const [type, setType] = useState(initial?.type ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCat3Change = (val: string) => {
-    setCat3(val);
+  const handleSubcategoryChange = (val: string) => {
+    setSubcategory(val);
   };
 
   const normalizedMatcher = normalizeMatcher(matcher);
   const invalidRegex = findInvalidRegex(normalizedMatcher);
-  const canSave = !matcherHasBlankPattern(normalizedMatcher) && !invalidRegex && cat3.trim() && cat2.trim() && cat1.trim();
+  const canSave = !matcherHasBlankPattern(normalizedMatcher) && !invalidRegex && subcategory.trim() && category.trim() && type.trim();
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -481,9 +481,9 @@ function RuleForm({
         field: primary.field,
         matchType: primary.matchType,
         caseSensitive: primary.caseSensitive ?? false,
-        cat3: cat3.trim(),
-        cat2: cat2.trim(),
-        cat1: cat1.trim(),
+        subcategory: subcategory.trim(),
+        category: category.trim(),
+        type: type.trim(),
       });
     } catch (err: any) {
       setError(String(err?.message ?? err));
@@ -500,23 +500,23 @@ function RuleForm({
       <MatcherEditor matcher={matcher} onChange={setMatcher} isRoot />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ color: '#45475a', fontSize: 13 }}>→</span>
-        <select value={cat1} onChange={e => setCat1(e.target.value)} style={{ ...selectStyle, width: 90 }}>
-          <option value="">cat1</option>
+        <select value={type} onChange={e => setType(e.target.value)} style={{ ...selectStyle, width: 90 }}>
+          <option value="">type</option>
           {CAT1_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
         <span style={{ color: '#45475a' }}>/</span>
-        <input list="cat2-options" placeholder="cat2" value={cat2} onChange={e => setCat2(e.target.value)}
+        <input list="category-options" placeholder="category" value={category} onChange={e => setCategory(e.target.value)}
           style={{ ...inputStyle, width: 120 }} />
-        <datalist id="cat2-options">
-          {getAllCat2Values().map(v => <option key={v} value={v} />)}
+        <datalist id="category-options">
+          {getAllCategoryValues().map(v => <option key={v} value={v} />)}
         </datalist>
         <span style={{ color: '#45475a' }}>/</span>
-        <input list="cat3-options" placeholder="cat3 (new or existing)" value={cat3}
-          onChange={e => handleCat3Change(e.target.value)}
+        <input list="subcategory-options" placeholder="subcategory (new or existing)" value={subcategory}
+          onChange={e => handleSubcategoryChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onCancel(); }}
           style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
-        <datalist id="cat3-options">
-          {getAllCat3Values().map(v => <option key={v} value={v} />)}
+        <datalist id="subcategory-options">
+          {getAllSubcategoryValues().map(v => <option key={v} value={v} />)}
         </datalist>
       </div>
       {invalidRegex && <div style={{ color: '#f38ba8', fontSize: 12 }}>{invalidRegex}</div>}
@@ -560,7 +560,7 @@ function CandidateRules() {
       {candidates.map(rule => editing === rule._id ? (
         <RuleForm
           key={rule._id}
-          initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
+          initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, subcategory: rule.subcategory, category: rule.category ?? '', type: rule.type ?? '' }}
           saveLabel="Save"
           onSave={async vals => { await mutateRuleWithCompatibility(updateRule, vals, { id: rule._id }); setEditing(null); }}
           onCancel={() => setEditing(null)}
@@ -592,7 +592,7 @@ function ActiveRules() {
   const updateRule = useMutation(api.rules.update);
   const applyAllRules = useAction(api.rules.applyAllRules);
   const [adding, setAdding] = useState(false);
-  const [addingToGroup, setAddingToGroup] = useState<{ cat1: string; cat2: string } | null>(null);
+  const [addingToGroup, setAddingToGroup] = useState<{ type: string; category: string } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
   const [rerunResult, setRerunResult] = useState<string | null>(null);
@@ -639,11 +639,11 @@ function ActiveRules() {
         <div style={{ color: '#4a5568', fontSize: 13 }}>No active rules yet.</div>
       )}
       {(() => {
-        // Group by cat1+cat2, preserving a stable order
+        // Group by type+category, preserving a stable order
         const CAT1_ORDER = ['MUST', 'WANT', 'MUST/WANT', 'INCOME', 'NOISE', 'TRANSFER'];
         const groups = new Map<string, typeof rules>();
         for (const rule of rules) {
-          const key = `${rule.cat1 ?? '?'} / ${rule.cat2 ?? '?'}`;
+          const key = `${rule.type ?? '?'} / ${rule.category ?? '?'}`;
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key)!.push(rule);
         }
@@ -656,25 +656,25 @@ function ActiveRules() {
         });
 
         return sorted.map(([groupKey, groupRules]) => {
-          const [cat1Label, cat2Label] = groupKey.split(' / ');
-          const isAddingHere = addingToGroup?.cat1 === cat1Label && addingToGroup?.cat2 === cat2Label;
+          const [typeLabel, categoryLabel] = groupKey.split(' / ');
+          const isAddingHere = addingToGroup?.type === typeLabel && addingToGroup?.category === categoryLabel;
           return (
             <div key={groupKey} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 4px 4px' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#74c7ec', letterSpacing: '0.06em' }}>{cat1Label}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#74c7ec', letterSpacing: '0.06em' }}>{typeLabel}</span>
                 <span style={{ fontSize: 11, color: '#45475a' }}>/</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#89b4fa' }}>{cat2Label}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#89b4fa' }}>{categoryLabel}</span>
                 <div style={{ flex: 1, height: 1, background: '#1e1e2e' }} />
                 <button
-                  onClick={() => setAddingToGroup(isAddingHere ? null : { cat1: cat1Label, cat2: cat2Label })}
+                  onClick={() => setAddingToGroup(isAddingHere ? null : { type: typeLabel, category: categoryLabel })}
                   style={{ ...btnStyle('transparent', '#a6e3a1', '1px solid #a6e3a133'), padding: '2px 8px', fontSize: 13, lineHeight: 1 }}
-                  title={`Add rule in ${cat1Label} / ${cat2Label}`}>
+                  title={`Add rule in ${typeLabel} / ${categoryLabel}`}>
                   +
                 </button>
               </div>
               {isAddingHere && (
                 <RuleForm
-                  initial={{ cat1: cat1Label, cat2: cat2Label }}
+                  initial={{ type: typeLabel, category: categoryLabel }}
                   saveLabel="Add"
                   onSave={async vals => {
                     await mutateRuleWithCompatibility(createRule, vals, { source: 'manual' });
@@ -686,7 +686,7 @@ function ActiveRules() {
               {groupRules.map(rule => editing === rule._id ? (
                 <RuleForm
                   key={rule._id}
-                  initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, cat3: rule.cat3, cat2: rule.cat2 ?? '', cat1: rule.cat1 ?? '' }}
+                  initial={{ pattern: rule.pattern, field: rule.field, matchType: rule.matchType, caseSensitive: rule.caseSensitive, matcher: rule.matcher, subcategory: rule.subcategory, category: rule.category ?? '', type: rule.type ?? '' }}
                   saveLabel="Save"
                   onSave={async vals => { await mutateRuleWithCompatibility(updateRule, vals, { id: rule._id }); setEditing(null); }}
                   onCancel={() => setEditing(null)}

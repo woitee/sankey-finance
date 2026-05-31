@@ -8,7 +8,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import type { LanguageModel } from "ai";
-import { getAllCat2Values } from "../src/config/categories";
+import { getAllCategoryValues } from "../src/config/categories";
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-haiku-4-5",
@@ -40,15 +40,15 @@ function createModel(): LanguageModel {
   }
 }
 
-function buildResponseSchema(validCat2Values: [string, ...string[]]) {
-  const cat2Enum = z.enum(validCat2Values);
+function buildResponseSchema(validCategoryValues: [string, ...string[]]) {
+  const categoryEnum = z.enum(validCategoryValues);
   return z.object({
     categories: z.array(
       z.object({
         index: z.number(),
-        cat1: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
-        cat2: cat2Enum,
-        cat3: z.string(),
+        type: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
+        category: categoryEnum,
+        subcategory: z.string(),
       }),
     ),
     rules: z.array(
@@ -62,9 +62,9 @@ function buildResponseSchema(validCat2Values: [string, ...string[]]) {
           "word",
           "regex",
         ]),
-        cat1: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
-        cat2: cat2Enum,
-        cat3: z.string(),
+        type: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
+        category: categoryEnum,
+        subcategory: z.string(),
       }),
     ),
   });
@@ -80,10 +80,10 @@ interface CategorizationRequest {
 async function categorizeBatch(
   model: LanguageModel,
   batch: CategorizationRequest[],
-  validCat3Values: string[],
+  validSubcategoryValues: string[],
 ) {
-  const validCat2Values = getAllCat2Values() as [string, ...string[]];
-  const responseSchema = buildResponseSchema(validCat2Values);
+  const validCategoryValues = getAllCategoryValues() as [string, ...string[]];
+  const responseSchema = buildResponseSchema(validCategoryValues);
 
   const transactionList = batch
     .map(
@@ -95,17 +95,17 @@ async function categorizeBatch(
   const { object } = await generateObject({
     model,
     schema: responseSchema,
-    system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign cat1, cat2, and cat3 for every transaction.
+    system: `You are a financial transaction categorizer for Czech bank statements (Czech Republic). Merchant names and details are in Czech or are Czech-market brands. Assign type, category, and subcategory for every transaction.
 
-cat1 rules (no exceptions):
+type rules (no exceptions):
 - Negative amounts (money leaving) → MUST, WANT, or MUST/WANT
 - Positive amounts (money arriving) → INCOME
 - MUST = non-negotiable recurring expenses (rent, groceries, utilities, health, transport essentials, child essentials, pet essentials)
 - WANT = discretionary spending (restaurants, entertainment, clothes, subscriptions, gadgets, etc.)
 - MUST/WANT = expenses that are partially necessary and partially discretionary; split 50/50 between MUST and WANT in reporting. Primary use case: restaurant meals and takeout/delivery (eating is necessary, but choosing a restaurant is discretionary). Also applies to other mixed-necessity purchases where the same transaction covers both a need and a want.
 
-cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(", ")}.
-Do NOT invent new cat2 values. If unsure, use "Other".
+category is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCategoryValues.join(", ")}.
+Do NOT invent new category values. If unsure, use "Other".
 
 Category reference (examples of what belongs where):
 - groceries: supermarkets — Billa, Albert, Kaufland, Lidl, Tesco, Penny, Globus, Coop, Hruška
@@ -150,7 +150,7 @@ Rule structure: "pattern" must be the SHORTEST string that uniquely identifies t
     messages: [
       {
         role: "user",
-        content: `Valid cat3 categories: ${JSON.stringify(validCat3Values)}
+        content: `Valid subcategory values: ${JSON.stringify(validSubcategoryValues)}
 
 Transactions to categorize:
 ${transactionList}`,
@@ -160,12 +160,12 @@ ${transactionList}`,
 
   const responses = batch.map((_, i) => {
     const entry = object.categories.find((p) => p.index === i + 1);
-    const cat3 = entry?.cat3 ?? "uncategorized";
-    const isValid = validCat3Values.includes(cat3);
+    const subcategory = entry?.subcategory ?? "uncategorized";
+    const isValid = validSubcategoryValues.includes(subcategory);
     return {
-      cat1: entry?.cat1 ?? "WANT",
-      cat2: entry?.cat2 ?? "Other",
-      cat3: isValid ? cat3 : "uncategorized",
+      type: entry?.type ?? "WANT",
+      category: entry?.category ?? "Other",
+      subcategory: isValid ? subcategory : "uncategorized",
       confidence: isValid ? 0.8 : 0,
     };
   });
@@ -181,7 +181,7 @@ ${transactionList}`,
     .filter(
       (r) =>
         r.pattern.trim() &&
-        validCat3Values.includes(r.cat3) &&
+        validSubcategoryValues.includes(r.subcategory) &&
         !MATCH_TYPE_KEYWORDS.has(r.pattern.trim()),
     )
     .map((r) => ({ ...r, pattern: r.pattern.trim() }));
@@ -244,11 +244,11 @@ export const categorize = action({
         transactionType: v.string(),
       }),
     ),
-    validCat3Values: v.array(v.string()),
+    validSubcategoryValues: v.array(v.string()),
   },
-  handler: async (_ctx, { requests, validCat3Values }) => {
+  handler: async (_ctx, { requests, validSubcategoryValues }) => {
     const model = createModel();
-    return await categorizeBatch(model, requests, validCat3Values);
+    return await categorizeBatch(model, requests, validSubcategoryValues);
   },
 });
 

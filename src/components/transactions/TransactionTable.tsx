@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Transaction } from '../../types/transaction';
 import type { ActiveRule } from '../../services/categorizer';
-import { getAllCat3Values, getAllCat2Values } from '../../config/categories';
+import { getAllSubcategoryValues, getAllCategoryValues } from '../../config/categories';
 import { extractGroups, type TransactionGroup } from '../../transforms/groups';
 import { ComboBox } from '../ComboBox';
 import { formatCurrency } from '../../utils/currency';
@@ -9,17 +9,17 @@ import { describeMatcher, getRuleMatcher } from '../../rules/matcher';
 
 export type CategoryFilter = {
   text?: string;
-  cat1?: string;
-  cat2?: string;
-  cat3?: string;
+  type?: string;
+  category?: string;
+  subcategory?: string;
 };
 
 export type CategoryEditPayload = {
   txId: string;
   merchantName: string;
-  cat3: string;
-  cat2?: string;
-  cat1?: string;
+  subcategory: string;
+  category?: string;
+  type?: string;
 };
 
 const selectStyle: React.CSSProperties = {
@@ -43,8 +43,8 @@ const btnStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-type EditingState = { txId: string; column: 'cat1' | 'cat2' | 'cat3' };
-type SortColumn = 'amount' | 'cat1' | 'cat2' | 'cat3';
+type EditingState = { txId: string; column: 'type' | 'category' | 'subcategory' };
+type SortColumn = 'amount' | 'type' | 'category' | 'subcategory';
 type SortDir = 'asc' | 'desc';
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
@@ -87,9 +87,9 @@ export function TransactionTable({
 }) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [text, setText] = useState(initialFilter.text ?? '');
-  const [filterCat1, setFilterCat1] = useState(initialFilter.cat1 ?? '');
-  const [filterCat2, setFilterCat2] = useState(initialFilter.cat2 ?? '');
-  const [filterCat3, setFilterCat3] = useState(initialFilter.cat3 ?? '');
+  const [filterType, setFilterType] = useState(initialFilter.type ?? '');
+  const [filterCategory, setFilterCategory] = useState(initialFilter.category ?? '');
+  const [filterSubcategory, setFilterSubcategory] = useState(initialFilter.subcategory ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [groupLabelInput, setGroupLabelInput] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -108,49 +108,49 @@ export function TransactionTable({
 
   useEffect(() => {
     setText(initialFilter.text ?? '');
-    setFilterCat1(initialFilter.cat1 ?? '');
-    setFilterCat2(initialFilter.cat2 ?? '');
-    setFilterCat3(initialFilter.cat3 ?? '');
+    setFilterType(initialFilter.type ?? '');
+    setFilterCategory(initialFilter.category ?? '');
+    setFilterSubcategory(initialFilter.subcategory ?? '');
   }, [initialFilter]);
 
   // Unique values for filter dropdowns
-  const { cat1Values, cat2Values, cat3Values } = useMemo(() => {
-    const c1 = new Set<string>(), c2 = new Set<string>(), c3 = new Set<string>();
+  const { typeValues, categoryValues, subcategoryValues } = useMemo(() => {
+    const t1 = new Set<string>(), c = new Set<string>(), s = new Set<string>();
     for (const t of transactions) {
-      if (t.cat1) c1.add(t.cat1);
-      if (t.cat2) c2.add(t.cat2);
-      if (t.cat3) c3.add(t.cat3);
+      if (t.type) t1.add(t.type);
+      if (t.category) c.add(t.category);
+      if (t.subcategory) s.add(t.subcategory);
     }
-    return { cat1Values: [...c1].sort(), cat2Values: [...c2].sort(), cat3Values: [...c3].sort() };
+    return { typeValues: [...t1].sort(), categoryValues: [...c].sort(), subcategoryValues: [...s].sort() };
   }, [transactions]);
 
-  const allCat2Options = useMemo(() => [...new Set([...getAllCat2Values(), ...cat2Values])].sort(), [cat2Values]);
-  const allCat3Options = useMemo(() => [...new Set([...getAllCat3Values(), ...cat3Values])].sort(), [cat3Values]);
+  const allCategoryOptions = useMemo(() => [...new Set([...getAllCategoryValues(), ...categoryValues])].sort(), [categoryValues]);
+  const allSubcategoryOptions = useMemo(() => [...new Set([...getAllSubcategoryValues(), ...subcategoryValues])].sort(), [subcategoryValues]);
 
-  const filteredCat2Values = useMemo(() => {
-    if (!filterCat1) return cat2Values;
-    return [...new Set(transactions.filter(t => t.cat1 === filterCat1 && t.cat2).map(t => t.cat2!))].sort();
-  }, [filterCat1, cat2Values, transactions]);
+  const filteredCategoryValues = useMemo(() => {
+    if (!filterType) return categoryValues;
+    return [...new Set(transactions.filter(t => t.type === filterType && t.category).map(t => t.category!))].sort();
+  }, [filterType, categoryValues, transactions]);
 
-  const filteredCat3Values = useMemo(() => {
+  const filteredSubcategoryValues = useMemo(() => {
     let pool = transactions;
-    if (filterCat1) pool = pool.filter(t => t.cat1 === filterCat1);
-    if (filterCat2) pool = pool.filter(t => t.cat2 === filterCat2);
-    return [...new Set(pool.filter(t => t.cat3).map(t => t.cat3!))].sort();
-  }, [filterCat1, filterCat2, transactions]);
+    if (filterType) pool = pool.filter(t => t.type === filterType);
+    if (filterCategory) pool = pool.filter(t => t.category === filterCategory);
+    return [...new Set(pool.filter(t => t.subcategory).map(t => t.subcategory!))].sort();
+  }, [filterType, filterCategory, transactions]);
 
   const filtered = useMemo(() => {
     return transactions.filter(t => {
-      if (filterCat1 && t.cat1 !== filterCat1) return false;
-      if (filterCat2 && t.cat2 !== filterCat2) return false;
-      if (filterCat3 && t.cat3 !== filterCat3) return false;
+      if (filterType && t.type !== filterType) return false;
+      if (filterCategory && t.category !== filterCategory) return false;
+      if (filterSubcategory && t.subcategory !== filterSubcategory) return false;
       if (text) {
         const q = text.toLowerCase();
         if (!t.merchantName.toLowerCase().includes(q) && !t.details.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [transactions, text, filterCat1, filterCat2, filterCat3]);
+  }, [transactions, text, filterType, filterCategory, filterSubcategory]);
 
   const toggleSort = useCallback((col: SortColumn) => {
     setSort(prev => {
@@ -177,7 +177,7 @@ export function TransactionTable({
     return sorted;
   }, [filtered, sort]);
 
-  const hasAnyFilter = text || filterCat1 || filterCat2 || filterCat3;
+  const hasAnyFilter = text || filterType || filterCategory || filterSubcategory;
 
   // Build display rows: group headers + grouped rows + ungrouped rows
   const { displayRows, groups } = useMemo(() => {
@@ -230,25 +230,25 @@ export function TransactionTable({
     return filtered.filter(t => selectedIds.has(t.id)).reduce((s, t) => s + t.amount, 0);
   }, [filtered, selectedIds]);
 
-  const handleCategoryEdit = (tx: Transaction, column: 'cat1' | 'cat2' | 'cat3', value: string) => {
+  const handleCategoryEdit = (tx: Transaction, column: 'type' | 'category' | 'subcategory', value: string) => {
     setEditing(null);
-    const newCat3 = column === 'cat3' ? value : (tx.cat3 || '');
-    const newCat2 = column === 'cat2' ? value : (tx.cat2 || undefined);
-    const newCat1 = column === 'cat1' ? value : (tx.cat1 || undefined);
-    onCorrect({ txId: tx.id, merchantName: tx.merchantName || tx.details, cat3: newCat3, cat2: newCat2, cat1: newCat1 });
+    const newSubcategory = column === 'subcategory' ? value : (tx.subcategory || '');
+    const newCategory = column === 'category' ? value : (tx.category || undefined);
+    const newType = column === 'type' ? value : (tx.type || undefined);
+    onCorrect({ txId: tx.id, merchantName: tx.merchantName || tx.details, subcategory: newSubcategory, category: newCategory, type: newType });
   };
 
   const renderTxRow = (tx: Transaction, isGroupMember: boolean, borderColor?: string) => {
-    const isEditingCat1 = editing?.txId === tx.id && editing.column === 'cat1';
-    const isEditingCat2 = editing?.txId === tx.id && editing.column === 'cat2';
-    const isEditingCat3 = editing?.txId === tx.id && editing.column === 'cat3';
+    const isEditingType = editing?.txId === tx.id && editing.column === 'type';
+    const isEditingCategory = editing?.txId === tx.id && editing.column === 'category';
+    const isEditingSubcategory = editing?.txId === tx.id && editing.column === 'subcategory';
 
     return (
       <tr
         key={tx.id}
         style={{
           borderBottom: '1px solid #1e1e2e',
-          background: selectedIds.has(tx.id) ? 'rgba(99, 102, 241, 0.1)' : !tx.cat3 ? 'rgba(245, 158, 11, 0.08)' : undefined,
+          background: selectedIds.has(tx.id) ? 'rgba(99, 102, 241, 0.1)' : !tx.subcategory ? 'rgba(245, 158, 11, 0.08)' : undefined,
         }}
       >
         {/* Checkbox */}
@@ -276,36 +276,36 @@ export function TransactionTable({
         <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: tx.amount > 0 ? '#22c55e' : '#e2e8f0', whiteSpace: 'nowrap' }}>
           {formatCurrency(tx.amount)}
         </td>
-        {/* Cat1 */}
-        <td style={{ padding: '8px 12px', cursor: 'pointer' }} onClick={() => { if (!isEditingCat1) setEditing({ txId: tx.id, column: 'cat1' }); }}>
-          {isEditingCat1 ? (
-            <select autoFocus value={tx.cat1 || ''} onClick={e => e.stopPropagation()} onChange={e => handleCategoryEdit(tx, 'cat1', e.target.value)} onBlur={() => setTimeout(() => setEditing(null), 150)}
+        {/* Type */}
+        <td style={{ padding: '8px 12px', cursor: 'pointer' }} onClick={() => { if (!isEditingType) setEditing({ txId: tx.id, column: 'type' }); }}>
+          {isEditingType ? (
+            <select autoFocus value={tx.type || ''} onClick={e => e.stopPropagation()} onChange={e => handleCategoryEdit(tx, 'type', e.target.value)} onBlur={() => setTimeout(() => setEditing(null), 150)}
               style={{ background: '#1e1e2e', color: '#cdd6f4', border: '1px solid #6366f1', borderRadius: 4, padding: '2px 4px', fontSize: 12 }}>
               <option value="">--</option><option value="MUST">MUST</option><option value="WANT">WANT</option><option value="MUST/WANT">MUST/WANT</option><option value="INCOME">INCOME</option><option value="NOISE">NOISE</option>
             </select>
-          ) : tx.cat1 ? (
+          ) : tx.type ? (
             <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-              background: tx.cat1 === 'NOISE' ? '#64748b1a' : tx.cat1 === 'MUST' ? '#e874611a' : tx.cat1 === 'WANT' ? '#6a9fdb1a' : tx.cat1 === 'MUST/WANT' ? '#c49adf1a' : '#6dbf7b1a',
-              color: tx.cat1 === 'NOISE' ? '#64748b' : tx.cat1 === 'MUST' ? '#e87461' : tx.cat1 === 'WANT' ? '#6a9fdb' : tx.cat1 === 'MUST/WANT' ? '#c49adf' : '#6dbf7b' }}>
-              {tx.cat1}
+              background: tx.type === 'NOISE' ? '#64748b1a' : tx.type === 'MUST' ? '#e874611a' : tx.type === 'WANT' ? '#6a9fdb1a' : tx.type === 'MUST/WANT' ? '#c49adf1a' : '#6dbf7b1a',
+              color: tx.type === 'NOISE' ? '#64748b' : tx.type === 'MUST' ? '#e87461' : tx.type === 'WANT' ? '#6a9fdb' : tx.type === 'MUST/WANT' ? '#c49adf' : '#6dbf7b' }}>
+              {tx.type}
             </span>
           ) : <span style={{ borderBottom: '1px dashed #6366f1', color: '#f59e0b', fontSize: 12 }}>set</span>}
         </td>
-        {/* Cat2 */}
-        <td style={{ padding: '8px 12px', cursor: 'pointer', color: '#94a3b8', minWidth: 100 }} onClick={() => { if (!isEditingCat2) setEditing({ txId: tx.id, column: 'cat2' }); }}>
-          {isEditingCat2 ? (
+        {/* Category */}
+        <td style={{ padding: '8px 12px', cursor: 'pointer', color: '#94a3b8', minWidth: 100 }} onClick={() => { if (!isEditingCategory) setEditing({ txId: tx.id, column: 'category' }); }}>
+          {isEditingCategory ? (
             <div onClick={e => e.stopPropagation()}>
-              <ComboBox value={tx.cat2 || ''} options={allCat2Options} placeholder="Category..." onChange={val => handleCategoryEdit(tx, 'cat2', val)} onCancel={() => setEditing(null)} />
+              <ComboBox value={tx.category || ''} options={allCategoryOptions} placeholder="Category..." onChange={val => handleCategoryEdit(tx, 'category', val)} onCancel={() => setEditing(null)} />
             </div>
-          ) : <span style={{ borderBottom: '1px dashed #313244' }}>{tx.cat2 || <span style={{ color: '#f59e0b', fontSize: 12 }}>set</span>}</span>}
+          ) : <span style={{ borderBottom: '1px dashed #313244' }}>{tx.category || <span style={{ color: '#f59e0b', fontSize: 12 }}>set</span>}</span>}
         </td>
-        {/* Cat3 */}
-        <td style={{ padding: '8px 12px', cursor: 'pointer', color: '#cdd6f4', minWidth: 120 }} onClick={() => { if (!isEditingCat3) setEditing({ txId: tx.id, column: 'cat3' }); }}>
-          {isEditingCat3 ? (
+        {/* Subcategory */}
+        <td style={{ padding: '8px 12px', cursor: 'pointer', color: '#cdd6f4', minWidth: 120 }} onClick={() => { if (!isEditingSubcategory) setEditing({ txId: tx.id, column: 'subcategory' }); }}>
+          {isEditingSubcategory ? (
             <div onClick={e => e.stopPropagation()}>
-              <ComboBox value={tx.cat3 || ''} options={allCat3Options} placeholder="Specific..." onChange={val => handleCategoryEdit(tx, 'cat3', val)} onCancel={() => setEditing(null)} />
+              <ComboBox value={tx.subcategory || ''} options={allSubcategoryOptions} placeholder="Specific..." onChange={val => handleCategoryEdit(tx, 'subcategory', val)} onCancel={() => setEditing(null)} />
             </div>
-          ) : <span style={{ borderBottom: '1px dashed #6366f1', color: tx.cat3 ? '#cdd6f4' : '#f59e0b' }}>{tx.cat3 || 'click to set'}</span>}
+          ) : <span style={{ borderBottom: '1px dashed #6366f1', color: tx.subcategory ? '#cdd6f4' : '#f59e0b' }}>{tx.subcategory || 'click to set'}</span>}
         </td>
         <td style={{ padding: '8px 12px', fontSize: 11 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -389,7 +389,7 @@ export function TransactionTable({
           </span>
         </td>
         <td style={{ padding: '8px 12px' }}>
-          <span style={{ color: '#94a3b8', fontSize: 12 }}>{group.primary.cat3}</span>
+          <span style={{ color: '#94a3b8', fontSize: 12 }}>{group.primary.subcategory}</span>
         </td>
         <td style={{ padding: '8px 12px' }}>
           <button onClick={() => onUngroup(group.groupId)} style={{ ...btnStyle, fontSize: 11, padding: '3px 8px', color: '#e87461', borderColor: '#e8746133' }}>
@@ -406,17 +406,17 @@ export function TransactionTable({
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="text" placeholder="Search merchant..." value={text} onChange={e => setText(e.target.value)}
           style={{ ...selectStyle, flex: '1 1 200px', padding: '8px 14px' }} />
-        <select value={filterCat1} onChange={e => { setFilterCat1(e.target.value); setFilterCat2(''); setFilterCat3(''); }} style={selectStyle}>
-          <option value="">All Cat1</option>{cat1Values.map(v => <option key={v} value={v}>{v}</option>)}
+        <select value={filterType} onChange={e => { setFilterType(e.target.value); setFilterCategory(''); setFilterSubcategory(''); }} style={selectStyle}>
+          <option value="">All Types</option>{typeValues.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={filterCat2} onChange={e => { setFilterCat2(e.target.value); setFilterCat3(''); }} style={selectStyle}>
-          <option value="">All Cat2</option>{filteredCat2Values.map(v => <option key={v} value={v}>{v}</option>)}
+        <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setFilterSubcategory(''); }} style={selectStyle}>
+          <option value="">All Categories</option>{filteredCategoryValues.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={filterCat3} onChange={e => setFilterCat3(e.target.value)} style={selectStyle}>
-          <option value="">All Cat3</option>{filteredCat3Values.map(v => <option key={v} value={v}>{v}</option>)}
+        <select value={filterSubcategory} onChange={e => setFilterSubcategory(e.target.value)} style={selectStyle}>
+          <option value="">All Subcategories</option>{filteredSubcategoryValues.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
         {hasAnyFilter && (
-          <button onClick={() => { setText(''); setFilterCat1(''); setFilterCat2(''); setFilterCat3(''); }} style={btnStyle}>Clear</button>
+          <button onClick={() => { setText(''); setFilterType(''); setFilterCategory(''); setFilterSubcategory(''); }} style={btnStyle}>Clear</button>
         )}
         <span style={{ color: '#64748b', fontSize: 12, marginLeft: 'auto' }}>
           {filtered.length} / {transactions.length}
@@ -499,14 +499,14 @@ export function TransactionTable({
               <th style={{ padding: '8px 12px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('amount')}>
                 Amount {sort?.column === 'amount' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
               </th>
-              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cat1')}>
-                Cat1 {sort?.column === 'cat1' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
+              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('type')}>
+                Type {sort?.column === 'type' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
               </th>
-              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cat2')}>
-                Cat2 {sort?.column === 'cat2' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
+              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('category')}>
+                Category {sort?.column === 'category' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
               </th>
-              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cat3')}>
-                Cat3 {sort?.column === 'cat3' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
+              <th style={{ padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('subcategory')}>
+                Subcategory {sort?.column === 'subcategory' ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
               </th>
               <th style={{ padding: '8px 12px' }}>Source</th>
             </tr>

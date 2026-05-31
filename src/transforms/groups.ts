@@ -24,7 +24,7 @@ export function extractGroups(transactions: Transaction[]): TransactionGroup[] {
   const groups: TransactionGroup[] = [];
   for (const [groupId, members] of groupMap) {
     // NOISE members stay visible in the group but don't count towards net amount
-    const countable = members.filter(m => m.cat1 !== 'NOISE');
+    const countable = members.filter(m => m.type !== 'NOISE');
     const primary = (countable.length > 0 ? countable : members).reduce((a, b) =>
       Math.abs(a.amount) >= Math.abs(b.amount) ? a : b,
     );
@@ -58,9 +58,9 @@ export function resolveGroups(transactions: Transaction[]): Transaction[] {
       ...p,
       amount: group.netAmount,
       // If net flipped to positive, treat as income
-      cat1: group.netAmount > 0 ? 'INCOME' : p.cat1,
-      cat2: group.netAmount > 0 ? 'OtherIncome' : p.cat2,
-      cat3: group.netAmount > 0 ? 'reimbursement' : p.cat3,
+      type: group.netAmount > 0 ? 'INCOME' : p.type,
+      category: group.netAmount > 0 ? 'OtherIncome' : p.category,
+      subcategory: group.netAmount > 0 ? 'reimbursement' : p.subcategory,
     };
     result.push(effective);
   }

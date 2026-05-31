@@ -103,16 +103,16 @@ export const upsert = mutation({
     period: v.string(),
     datePosted: v.string(),
     dateExecuted: v.string(),
-    type: v.string(),
+    transactionType: v.string(),
     cardholderName: v.string(),
     accountIdentifier: v.string(),
     merchantName: v.string(),
     details: v.string(),
     amount: v.number(),
     fees: v.number(),
-    cat3: v.union(v.string(), v.null()),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    subcategory: v.union(v.string(), v.null()),
+    category: v.union(v.string(), v.null()),
+    type: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
       v.literal("unverified_rule"),
@@ -143,9 +143,9 @@ export const upsert = mutation({
 export const updateCategories = mutation({
   args: {
     id: v.id("transactions"),
-    cat3: v.union(v.string(), v.null()),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    subcategory: v.union(v.string(), v.null()),
+    category: v.union(v.string(), v.null()),
+    type: v.union(v.string(), v.null()),
     categorizationSource: v.union(
       v.literal("rule"),
       v.literal("unverified_rule"),
@@ -155,8 +155,8 @@ export const updateCategories = mutation({
     ),
     ruleId: v.optional(v.id("rules")),
   },
-  handler: async (ctx, { id, cat3, cat2, cat1, categorizationSource, ruleId }) => {
-    await ctx.db.patch(id, { cat3, cat2, cat1, categorizationSource, ruleId });
+  handler: async (ctx, { id, subcategory, category, type, categorizationSource, ruleId }) => {
+    await ctx.db.patch(id, { subcategory, category, type, categorizationSource, ruleId });
   },
 });
 
@@ -181,7 +181,7 @@ export const batchUpsert = mutation({
       bankAccountNumber: v.optional(v.string()),
       datePosted: v.string(),
       dateExecuted: v.string(),
-      type: v.string(),
+      transactionType: v.string(),
       cardholderName: v.string(),
       accountIdentifier: v.string(),
       merchantName: v.string(),
@@ -202,7 +202,7 @@ export const batchUpsert = mutation({
       if (!existing) {
         await ctx.db.insert("transactions", {
           ...tx,
-          cat3: null, cat2: null, cat1: null,
+          subcategory: null, category: null, type: null,
           categorizationSource: null,
           groupId: null, groupLabel: null,
         });
@@ -221,9 +221,9 @@ export const batchUpdateCategories = mutation({
     updates: v.array(
       v.object({
         id: v.id("transactions"),
-        cat3: v.union(v.string(), v.null()),
-        cat2: v.union(v.string(), v.null()),
-        cat1: v.union(v.string(), v.null()),
+        subcategory: v.union(v.string(), v.null()),
+        category: v.union(v.string(), v.null()),
+        type: v.union(v.string(), v.null()),
         categorizationSource: v.union(
           v.literal("rule"),
           v.literal("unverified_rule"),
@@ -236,8 +236,8 @@ export const batchUpdateCategories = mutation({
     ),
   },
   handler: async (ctx, { updates }) => {
-    for (const { id, cat3, cat2, cat1, categorizationSource, ruleId } of updates) {
-      await ctx.db.patch(id, { cat3, cat2, cat1, categorizationSource, ruleId });
+    for (const { id, subcategory, category, type, categorizationSource, ruleId } of updates) {
+      await ctx.db.patch(id, { subcategory, category, type, categorizationSource, ruleId });
     }
   },
 });
@@ -262,7 +262,7 @@ export const replaceByImport = mutation({
       bankAccountNumber: v.optional(v.string()),
       datePosted: v.string(),
       dateExecuted: v.string(),
-      type: v.string(),
+      transactionType: v.string(),
       cardholderName: v.string(),
       accountIdentifier: v.string(),
       merchantName: v.string(),
@@ -307,9 +307,9 @@ export const replaceByImport = mutation({
       await ctx.db.insert("transactions", {
         ...tx,
         importId,
-        cat3: null,
-        cat2: null,
-        cat1: null,
+        subcategory: null,
+        category: null,
+        type: null,
         categorizationSource: null,
         groupId: null,
         groupLabel: null,

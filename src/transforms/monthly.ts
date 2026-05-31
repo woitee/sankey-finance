@@ -14,7 +14,7 @@ export function computeMonthlySummary(
       totalIncome += tx.amount;
     } else {
       totalOutcome += Math.abs(tx.amount);
-      const cat = tx.cat2 ?? 'Other';
+      const cat = tx.category ?? 'Other';
       byCategory[cat] = (byCategory[cat] ?? 0) + Math.abs(tx.amount);
     }
   }

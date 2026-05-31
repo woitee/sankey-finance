@@ -1,6 +1,6 @@
 import type { ConvexReactClient } from 'convex/react';
 import type { Transaction } from '../types/transaction';
-import { resolveCategory, getAllCat3Values } from '../config/categories';
+import { resolveCategory, getAllSubcategoryValues } from '../config/categories';
 import { createLLMProvider } from './llm';
 import type { CategorizationRequest, RuleSuggestion } from './llm';
 import { matchesTransactionRule } from '../rules/matcher';
@@ -13,9 +13,9 @@ export interface ActiveRule extends RuleLike {
   matchType: 'contains' | 'exact' | 'startsWith' | 'word' | 'regex';
   caseSensitive?: boolean;
   matcher?: RuleMatcher | null;
-  cat3: string;
-  cat2: string | null;
-  cat1: string | null;
+  subcategory: string;
+  category: string | null;
+  type: string | null;
 }
 
 export interface CategorizationResult {
@@ -39,24 +39,24 @@ export async function categorizeTransactions(
     const tx = { ...result[i] };
     result[i] = tx;
 
-    if (tx.cat3) continue;
+    if (tx.subcategory) continue;
 
     // Active rules
     const matchedRule = activeRules.find(r => matchesRule(tx, r));
     if (matchedRule) {
-      applyCategories(tx, matchedRule.cat3, 'rule', matchedRule.cat2 ?? undefined, matchedRule.cat1 ?? undefined);
+      applyCategories(tx, matchedRule.subcategory, 'rule', matchedRule.category ?? undefined, matchedRule.type ?? undefined);
       tx.ruleId = matchedRule.id ?? null;
       continue;
     }
 
     // Auto-categorize income
     if (tx.amount > 0) {
-      if (tx.type === 'prichozi_uhrada' || tx.type === 'odmena_unity' || tx.type === 'vraceni_penez') {
-        const cat3 = tx.type === 'vraceni_penez' ? 'refund'
-          : tx.type === 'odmena_unity' ? 'cashback'
+      if (tx.transactionType === 'prichozi_uhrada' || tx.transactionType === 'odmena_unity' || tx.transactionType === 'vraceni_penez') {
+        const subcategory = tx.transactionType === 'vraceni_penez' ? 'refund'
+          : tx.transactionType === 'odmena_unity' ? 'cashback'
           : tx.amount > 50000 ? 'salary'
           : 'transfer_in';
-        applyCategories(tx, cat3, 'rule');
+        applyCategories(tx, subcategory, 'rule');
         continue;
       }
     }
@@ -69,7 +69,7 @@ export async function categorizeTransactions(
           merchantName: tx.merchantName,
           details: tx.details,
           amount: tx.amount,
-          transactionType: tx.type,
+          transactionType: tx.transactionType,
         },
       });
     }
@@ -82,10 +82,10 @@ export async function categorizeTransactions(
     try {
       if (!convexClient) throw new Error('convexClient is required for LLM categorization');
       const provider = createLLMProvider(convexClient);
-      const validCat3 = getAllCat3Values();
+      const validSubcategories = getAllSubcategoryValues();
       const llmResult = await provider.categorize(
         needsLLM.map(n => n.request),
-        validCat3,
+        validSubcategories,
       );
 
       for (let j = 0; j < needsLLM.length; j++) {
@@ -93,7 +93,7 @@ export async function categorizeTransactions(
         const response = llmResult.responses[j];
         const tx = { ...result[index] };
         result[index] = tx;
-        applyCategories(tx, response.cat3, 'llm', response.cat2, response.cat1);
+        applyCategories(tx, response.subcategory, 'llm', response.category, response.type);
       }
 
       ruleSuggestions = llmResult.ruleSuggestions;
@@ -107,21 +107,21 @@ export async function categorizeTransactions(
 
 function applyCategories(
   tx: Transaction,
-  cat3: string,
+  subcategory: string,
   source: 'rule' | 'llm' | 'manual',
-  cat2Override?: string | null,
-  cat1Override?: string | null,
+  categoryOverride?: string | null,
+  typeOverride?: string | null,
 ) {
-  tx.cat3 = cat3;
+  tx.subcategory = subcategory;
   if (source === 'llm') {
-    tx.cat2 = cat2Override ?? 'Other';
-    tx.cat1 = cat1Override ?? 'WANT';
+    tx.category = categoryOverride ?? 'Other';
+    tx.type = typeOverride ?? 'WANT';
   } else {
-    const resolved = resolveCategory(cat3);
-    tx.cat2 = cat2Override ?? resolved?.cat2 ?? 'Other';
-    tx.cat1 = cat1Override ?? resolved?.cat1 ?? 'WANT';
+    const resolved = resolveCategory(subcategory);
+    tx.category = categoryOverride ?? resolved?.category ?? 'Other';
+    tx.type = typeOverride ?? resolved?.type ?? 'WANT';
   }
   // NOISE is manual-only — never assign it through automated flows
-  if (source !== 'manual' && tx.cat1 === 'NOISE') tx.cat1 = 'WANT';
+  if (source !== 'manual' && tx.type === 'NOISE') tx.type = 'WANT';
   tx.categorizationSource = source;
 }

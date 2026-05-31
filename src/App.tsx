@@ -63,9 +63,9 @@ function isValidDateString(value: string | null): value is string {
 function normalizeFilter(filter: CategoryFilter): CategoryFilter {
   return {
     ...(filter.text ? { text: filter.text } : {}),
-    ...(filter.cat1 ? { cat1: filter.cat1 } : {}),
-    ...(filter.cat2 ? { cat2: filter.cat2 } : {}),
-    ...(filter.cat3 ? { cat3: filter.cat3 } : {}),
+    ...(filter.type ? { type: filter.type } : {}),
+    ...(filter.category ? { category: filter.category } : {}),
+    ...(filter.subcategory ? { subcategory: filter.subcategory } : {}),
   };
 }
 
@@ -85,9 +85,9 @@ function parseRoute(location: Location): RouteState {
       to,
       txFilter: normalizeFilter({
         text: params.get('text') ?? undefined,
-        cat1: params.get('cat1') ?? undefined,
-        cat2: params.get('cat2') ?? undefined,
-        cat3: params.get('cat3') ?? undefined,
+        type: params.get('type') ?? undefined,
+        category: params.get('category') ?? undefined,
+        subcategory: params.get('subcategory') ?? undefined,
       }),
       ruleId: null,
     };
@@ -129,9 +129,9 @@ function buildRouteUrl(route: RouteState): string {
 
   if (route.tab === 'transactions') {
     if (route.txFilter.text) params.set('text', route.txFilter.text);
-    if (route.txFilter.cat1) params.set('cat1', route.txFilter.cat1);
-    if (route.txFilter.cat2) params.set('cat2', route.txFilter.cat2);
-    if (route.txFilter.cat3) params.set('cat3', route.txFilter.cat3);
+    if (route.txFilter.type) params.set('type', route.txFilter.type);
+    if (route.txFilter.category) params.set('category', route.txFilter.category);
+    if (route.txFilter.subcategory) params.set('subcategory', route.txFilter.subcategory);
     const search = params.toString();
     return `/transactions${search ? `?${search}` : ''}`;
   }
@@ -218,16 +218,16 @@ export default function App() {
         bankAccountNumber: doc.bankAccountNumber,
         datePosted: doc.datePosted,
         dateExecuted: doc.dateExecuted,
-        type: doc.type as Transaction['type'],
+        transactionType: doc.transactionType as Transaction['transactionType'],
         cardholderName: nicknameMap.get(doc.cardholderName) ?? doc.cardholderName,
         accountIdentifier: doc.accountIdentifier,
         merchantName: doc.merchantName,
         details: doc.details,
         amount: doc.amount,
         fees: doc.fees,
-        cat3: doc.cat3,
-        cat2: doc.cat2,
-        cat1: doc.cat1,
+        subcategory: doc.subcategory,
+        category: doc.category,
+        type: doc.type,
         categorizationSource: doc.categorizationSource,
         ruleId: doc.ruleId,
         groupId: doc.groupId,
@@ -254,9 +254,9 @@ export default function App() {
         matchType: r.matchType,
         caseSensitive: r.caseSensitive,
         matcher: r.matcher,
-        cat3: r.cat3,
-        cat2: r.cat2,
-        cat1: r.cat1,
+        subcategory: r.subcategory,
+        category: r.category,
+        type: r.type,
       })),
     [convexActiveRules],
   );
@@ -270,9 +270,9 @@ export default function App() {
         matchType: r.matchType,
         caseSensitive: r.caseSensitive,
         matcher: r.matcher,
-        cat3: r.cat3,
-        cat2: r.cat2,
-        cat1: r.cat1,
+        subcategory: r.subcategory,
+        category: r.category,
+        type: r.type,
       })),
     [convexCandidateRules],
   );
@@ -373,18 +373,18 @@ export default function App() {
           const orig = origMap.get(tx.id);
           return (
             orig &&
-            (orig.cat3 !== tx.cat3 ||
-              orig.cat2 !== tx.cat2 ||
-              orig.cat1 !== tx.cat1 ||
+            (orig.subcategory !== tx.subcategory ||
+              orig.category !== tx.category ||
+              orig.type !== tx.type ||
               orig.categorizationSource !== tx.categorizationSource ||
               (orig.ruleId ?? null) !== (tx.ruleId ?? null))
           );
         })
         .map(tx => ({
           id: idMap.get(tx.id)!,
-          cat3: tx.cat3,
-          cat2: tx.cat2,
-          cat1: tx.cat1,
+          subcategory: tx.subcategory,
+          category: tx.category,
+          type: tx.type,
           categorizationSource: tx.categorizationSource,
           ...(tx.ruleId ? { ruleId: tx.ruleId as Id<'rules'> } : {}),
         }));
@@ -401,7 +401,7 @@ export default function App() {
     if (txLoading || transactions.length === 0) return;
     const rangeKey = `${from}::${to}`;
     if (autoCategorizedRef.current.has(rangeKey)) return;
-    const hasUncategorized = transactions.some(tx => !tx.cat3);
+    const hasUncategorized = transactions.some(tx => !tx.subcategory);
     if (!hasUncategorized) {
       autoCategorizedRef.current.add(rangeKey);
       return;
@@ -423,9 +423,9 @@ export default function App() {
           pattern: r.pattern,
           field: r.field,
           matchType: r.matchType,
-          cat3: r.cat3,
-          cat2: r.cat2 ?? null,
-          cat1: r.cat1 ?? null,
+          subcategory: r.subcategory,
+          category: r.category ?? null,
+          type: r.type ?? null,
         }));
 
         const newRules = await batchCreateCandidates({ rules: candidates });
@@ -438,9 +438,9 @@ export default function App() {
             if (!matched) return tx;
             return {
               ...tx,
-              cat3: matched.cat3,
-              cat2: matched.cat2,
-              cat1: matched.cat1,
+              subcategory: matched.subcategory,
+              category: matched.category,
+              type: matched.type,
               categorizationSource: 'unverified_rule' as const,
               ruleId: matched._id as string,
             };
@@ -471,7 +471,7 @@ export default function App() {
       const selected = transactions.filter(tx => ids.includes(tx.id));
       if (!selected.length) return;
       const reset = selected.map(tx => ({
-        ...tx, cat3: null, cat2: null, cat1: null, categorizationSource: null as any,
+        ...tx, subcategory: null, category: null, type: null, categorizationSource: null as any,
       }));
       setCategorizeModalIsAll(false);
       setCategorizeModalTxs(reset);
@@ -491,9 +491,9 @@ export default function App() {
           pattern: r.pattern,
           field: r.field,
           matchType: r.matchType,
-          cat3: r.cat3,
-          cat2: r.cat2 ?? null,
-          cat1: r.cat1 ?? null,
+          subcategory: r.subcategory,
+          category: r.category ?? null,
+          type: r.type ?? null,
         }));
         const newRules = await batchCreateCandidates({ rules: candidates });
         candidatesCreated = newRules.length;
@@ -505,9 +505,9 @@ export default function App() {
             if (!matched) return tx;
             return {
               ...tx,
-              cat3: matched.cat3,
-              cat2: matched.cat2,
-              cat1: matched.cat1,
+              subcategory: matched.subcategory,
+              category: matched.category,
+              type: matched.type,
               categorizationSource: 'unverified_rule' as const,
               ruleId: matched._id as string,
             };
@@ -520,9 +520,9 @@ export default function App() {
         .filter(tx => idMap.has(tx.id))
         .map(tx => ({
           id: idMap.get(tx.id)!,
-          cat3: tx.cat3,
-          cat2: tx.cat2,
-          cat1: tx.cat1,
+          subcategory: tx.subcategory,
+          category: tx.category,
+          type: tx.type,
           categorizationSource: tx.categorizationSource,
           ...(tx.ruleId ? { ruleId: tx.ruleId as Id<'rules'> } : {}),
         }));
@@ -541,9 +541,9 @@ export default function App() {
         updates: [
           {
             id: target._convexId,
-            cat3: payload.cat3 || target.cat3,
-            cat2: payload.cat2 ?? target.cat2,
-            cat1: payload.cat1 ?? target.cat1,
+            subcategory: payload.subcategory || target.subcategory,
+            category: payload.category ?? target.category,
+            type: payload.type ?? target.type,
             categorizationSource: 'manual',
           },
         ],
@@ -593,9 +593,8 @@ export default function App() {
   // ── Chart data ───────────────────────────────────────────────────────────────
   const effectiveTransactions = useMemo(
     () => resolveGroups(transactions).filter(t => {
-      if (t.cat1 === 'NOISE') return false;
-      // Transfers between own accounts cancel out when viewing all accounts
-      if (t.cat1 === 'TRANSFER' && selectedAccount === 'all') return false;
+      if (t.type === 'NOISE') return false;
+      if (t.type === 'TRANSFER' && selectedAccount === 'all') return false;
       return true;
     }),
     [transactions, selectedAccount],
@@ -863,7 +862,7 @@ export default function App() {
                     checked={showCat3}
                     onChange={e => setShowCat3(e.target.checked)}
                   />
-                  Show detailed categories (cat3)
+                  Show subcategories
                 </label>
               </div>
               {sankeyData.links.length > 0 ? (
@@ -872,40 +871,38 @@ export default function App() {
                   height={550}
                   onNodeClick={name => {
                     if (name === 'Income' || name === 'Savings' || name === 'Deficit') return;
-                    const cat1Set = new Set(['MUST', 'WANT', 'INCOME']);
-                    // Derive cat2 nodes from the actual sankey data: targets of MUST/WANT links
-                    const cat2Set = new Set(
+                    const typeSet = new Set(['MUST', 'WANT', 'INCOME']);
+                    const categorySet = new Set(
                       sankeyData.links
-                        .filter(l => cat1Set.has(l.source))
+                        .filter(l => typeSet.has(l.source))
                         .map(l => l.target),
                     );
-                    if (cat1Set.has(name)) {
-                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat1: name }, ruleId: null });
-                    } else if (cat2Set.has(name)) {
-                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat2: name }, ruleId: null });
+                    if (typeSet.has(name)) {
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { type: name }, ruleId: null });
+                    } else if (categorySet.has(name)) {
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { category: name }, ruleId: null });
                     } else {
-                      navigateTo({ tab: 'transactions', from, to, txFilter: { cat3: name }, ruleId: null });
+                      navigateTo({ tab: 'transactions', from, to, txFilter: { subcategory: name }, ruleId: null });
                     }
                   }}
                   onLinkClick={(source, target) => {
                     if (target === 'Savings' || target === 'Deficit') return;
-                    const cat1Set = new Set(['MUST', 'WANT', 'INCOME']);
-                    // Derive cat2 nodes from the actual sankey data: targets of MUST/WANT links
-                    const cat2Set = new Set(
+                    const typeSet = new Set(['MUST', 'WANT', 'INCOME']);
+                    const categorySet = new Set(
                       sankeyData.links
-                        .filter(l => cat1Set.has(l.source))
+                        .filter(l => typeSet.has(l.source))
                         .map(l => l.target),
                     );
                     const filter: CategoryFilter = {};
 
                     if (source !== 'Income' && source !== 'Deficit') {
-                      if (cat1Set.has(source)) filter.cat1 = source;
-                      else if (cat2Set.has(source)) filter.cat2 = source;
+                      if (typeSet.has(source)) filter.type = source;
+                      else if (categorySet.has(source)) filter.category = source;
                     }
 
-                    if (cat1Set.has(target)) filter.cat1 = target;
-                    else if (cat2Set.has(target)) filter.cat2 = target;
-                    else filter.cat3 = target;
+                    if (typeSet.has(target)) filter.type = target;
+                    else if (categorySet.has(target)) filter.category = target;
+                    else filter.subcategory = target;
 
                     navigateTo({ tab: 'transactions', from, to, txFilter: filter, ruleId: null });
                   }}
@@ -964,18 +961,18 @@ export default function App() {
                     pattern,
                     field,
                     matchType: 'contains',
-                    cat3: tx.cat3 || '',
-                    cat2: tx.cat2 ?? null,
-                    cat1: tx.cat1 ?? null,
+                    subcategory: tx.subcategory || '',
+                    category: tx.category ?? null,
+                    type: tx.type ?? null,
                   }],
                 });
                 const rule = created[0];
                 if (rule) {
                   await updateCategoriesMutation({
                     id: (tx as TxDoc)._convexId,
-                    cat3: tx.cat3 ?? null,
-                    cat2: tx.cat2 ?? null,
-                    cat1: tx.cat1 ?? null,
+                    subcategory: tx.subcategory ?? null,
+                    category: tx.category ?? null,
+                    type: tx.type ?? null,
                     categorizationSource: 'unverified_rule',
                     ruleId: rule._id,
                   });

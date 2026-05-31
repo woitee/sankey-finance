@@ -3,16 +3,16 @@ import ReactECharts from 'echarts-for-react';
 import type { Transaction } from '../../types/transaction';
 import { formatCurrency } from '../../utils/currency';
 
-type Level = 'cat1' | 'cat2' | 'cat3';
+type Level = 'type' | 'category' | 'subcategory';
 
 const LEVEL_LABELS: Record<Level, string> = {
-  cat1: 'Cat1',
-  cat2: 'Cat2',
-  cat3: 'Cat3',
+  type: 'Type',
+  category: 'Category',
+  subcategory: 'Subcategory',
 };
 
 export function CategoryBreakdown({ transactions }: { transactions: Transaction[] }) {
-  const [level, setLevel] = useState<Level>('cat1');
+  const [level, setLevel] = useState<Level>('type');
 
   const expenses = useMemo(
     () => transactions.filter(t => t.amount < 0),
@@ -37,15 +37,13 @@ export function CategoryBreakdown({ transactions }: { transactions: Transaction[
       byCategory['Deficit'] = Math.round(Math.abs(balance));
     }
 
-    // For cat1, use fixed order: MUST → WANT → Savings/Deficit
-    if (level === 'cat1') {
-      const CAT1_ORDER = ['MUST', 'WANT', 'Savings', 'Deficit'];
-      return CAT1_ORDER
+    if (level === 'type') {
+      const TYPE_ORDER = ['MUST', 'WANT', 'Savings', 'Deficit'];
+      return TYPE_ORDER
         .filter(k => byCategory[k] != null)
         .map(k => [k, byCategory[k]] as [string, number]);
     }
 
-    // For cat2/cat3, sort by value but keep Savings/Deficit at the end
     const entries = Object.entries(byCategory);
     const balanceEntry = entries.find(([k]) => k === 'Savings' || k === 'Deficit');
     const rest = entries.filter(([k]) => k !== 'Savings' && k !== 'Deficit').sort((a, b) => b[1] - a[1]);
@@ -76,7 +74,7 @@ export function CategoryBreakdown({ transactions }: { transactions: Transaction[
   return (
     <div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {(['cat1', 'cat2', 'cat3'] as Level[]).map(l => (
+        {(['type', 'category', 'subcategory'] as Level[]).map(l => (
           <button
             key={l}
             onClick={() => setLevel(l)}

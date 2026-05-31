@@ -2,94 +2,94 @@ import type { CategoryHierarchy } from '../types/category';
 
 export const CATEGORY_HIERARCHY: CategoryHierarchy = {
   // --- MUST / Living ---
-  rent:              { cat2: 'Living', cat1: 'MUST' },
-  utilities_gas:     { cat2: 'Living', cat1: 'MUST' },
-  utilities_electric:{ cat2: 'Living', cat1: 'MUST' },
-  internet:          { cat2: 'Living', cat1: 'MUST' },
-  mobile_plan:       { cat2: 'Living', cat1: 'MUST' },
-  municipal_fee:     { cat2: 'Living', cat1: 'MUST' },
+  rent:              { category: 'Living', type: 'MUST' },
+  utilities_gas:     { category: 'Living', type: 'MUST' },
+  utilities_electric:{ category: 'Living', type: 'MUST' },
+  internet:          { category: 'Living', type: 'MUST' },
+  mobile_plan:       { category: 'Living', type: 'MUST' },
+  municipal_fee:     { category: 'Living', type: 'MUST' },
 
   // --- MUST / Food ---
-  groceries:         { cat2: 'Food', cat1: 'MUST' },
+  groceries:         { category: 'Food', type: 'MUST' },
 
   // --- WANT / Food ---
-  restaurant:        { cat2: 'Food', cat1: 'WANT' },
-  food_delivery:     { cat2: 'Food', cat1: 'WANT' },
-  fast_food:         { cat2: 'Food', cat1: 'WANT' },
-  cafe:              { cat2: 'Food', cat1: 'WANT' },
-  snacks_vending:    { cat2: 'Food', cat1: 'WANT' },
+  restaurant:        { category: 'Food', type: 'WANT' },
+  food_delivery:     { category: 'Food', type: 'WANT' },
+  fast_food:         { category: 'Food', type: 'WANT' },
+  cafe:              { category: 'Food', type: 'WANT' },
+  snacks_vending:    { category: 'Food', type: 'WANT' },
 
   // --- MUST / Health ---
-  pharmacy:          { cat2: 'Health', cat1: 'MUST' },
-  doctor:            { cat2: 'Health', cat1: 'MUST' },
-  maternity_care:    { cat2: 'Health', cat1: 'MUST' },
+  pharmacy:          { category: 'Health', type: 'MUST' },
+  doctor:            { category: 'Health', type: 'MUST' },
+  maternity_care:    { category: 'Health', type: 'MUST' },
 
   // --- MUST / Transport ---
-  fuel:              { cat2: 'Transport', cat1: 'MUST' },
-  public_transport:  { cat2: 'Transport', cat1: 'MUST' },
-  highway_toll:      { cat2: 'Transport', cat1: 'MUST' },
-  car_wash:          { cat2: 'Transport', cat1: 'WANT' },
-  car_maintenance:   { cat2: 'Transport', cat1: 'MUST' },
-  rest_stop:         { cat2: 'Transport', cat1: 'WANT' },
+  fuel:              { category: 'Transport', type: 'MUST' },
+  public_transport:  { category: 'Transport', type: 'MUST' },
+  highway_toll:      { category: 'Transport', type: 'MUST' },
+  car_wash:          { category: 'Transport', type: 'WANT' },
+  car_maintenance:   { category: 'Transport', type: 'MUST' },
+  rest_stop:         { category: 'Transport', type: 'WANT' },
 
   // --- WANT / Subscriptions ---
-  streaming:         { cat2: 'Subscriptions', cat1: 'WANT' },
-  app_subscription:  { cat2: 'Subscriptions', cat1: 'WANT' },
-  music_subscription:{ cat2: 'Subscriptions', cat1: 'WANT' },
+  streaming:         { category: 'Subscriptions', type: 'WANT' },
+  app_subscription:  { category: 'Subscriptions', type: 'WANT' },
+  music_subscription:{ category: 'Subscriptions', type: 'WANT' },
 
   // --- WANT / Entertainment ---
-  cinema:            { cat2: 'Entertainment', cat1: 'WANT' },
-  board_games:       { cat2: 'Entertainment', cat1: 'WANT' },
-  concerts_events:   { cat2: 'Entertainment', cat1: 'WANT' },
-  books:             { cat2: 'Entertainment', cat1: 'WANT' },
-  eating_out:        { cat2: 'Entertainment', cat1: 'WANT' },
+  cinema:            { category: 'Entertainment', type: 'WANT' },
+  board_games:       { category: 'Entertainment', type: 'WANT' },
+  concerts_events:   { category: 'Entertainment', type: 'WANT' },
+  books:             { category: 'Entertainment', type: 'WANT' },
+  eating_out:        { category: 'Entertainment', type: 'WANT' },
 
   // --- Clothes ---
-  clothes:           { cat2: 'Clothes', cat1: 'WANT' },
-  clothes_discount:  { cat2: 'Clothes', cat1: 'WANT' },
+  clothes:           { category: 'Clothes', type: 'WANT' },
+  clothes_discount:  { category: 'Clothes', type: 'WANT' },
 
   // --- Child ---
-  child_supplies:    { cat2: 'Child', cat1: 'MUST' },
-  child_education:   { cat2: 'Child', cat1: 'MUST' },
-  child_toys:        { cat2: 'Child', cat1: 'WANT' },
-  child_magazine:    { cat2: 'Child', cat1: 'WANT' },
+  child_supplies:    { category: 'Child', type: 'MUST' },
+  child_education:   { category: 'Child', type: 'MUST' },
+  child_toys:        { category: 'Child', type: 'WANT' },
+  child_magazine:    { category: 'Child', type: 'WANT' },
 
   // --- Pet ---
-  pet_food:          { cat2: 'Pet', cat1: 'MUST' },
-  pet_supplies:      { cat2: 'Pet', cat1: 'MUST' },
-  vet:               { cat2: 'Pet', cat1: 'MUST' },
-  dog_fee:           { cat2: 'Pet', cat1: 'MUST' },
+  pet_food:          { category: 'Pet', type: 'MUST' },
+  pet_supplies:      { category: 'Pet', type: 'MUST' },
+  vet:               { category: 'Pet', type: 'MUST' },
+  dog_fee:           { category: 'Pet', type: 'MUST' },
 
   // --- Gifts ---
-  gifts:             { cat2: 'Gifts', cat1: 'WANT' },
+  gifts:             { category: 'Gifts', type: 'WANT' },
 
   // --- Personal ---
-  electronics:       { cat2: 'Personal', cat1: 'WANT' },
-  household:         { cat2: 'Personal', cat1: 'WANT' },
+  electronics:       { category: 'Personal', type: 'WANT' },
+  household:         { category: 'Personal', type: 'WANT' },
 
   // --- INCOME ---
-  salary:            { cat2: 'Salary', cat1: 'INCOME' },
-  transfer_in:       { cat2: 'OtherIncome', cat1: 'INCOME' },
-  refund:            { cat2: 'OtherIncome', cat1: 'INCOME' },
-  cashback:          { cat2: 'OtherIncome', cat1: 'INCOME' },
-  reimbursement:     { cat2: 'OtherIncome', cat1: 'INCOME' },
+  salary:            { category: 'Salary', type: 'INCOME' },
+  transfer_in:       { category: 'OtherIncome', type: 'INCOME' },
+  refund:            { category: 'OtherIncome', type: 'INCOME' },
+  cashback:          { category: 'OtherIncome', type: 'INCOME' },
+  reimbursement:     { category: 'OtherIncome', type: 'INCOME' },
 
   // --- Other ---
-  uncategorized:     { cat2: 'Other', cat1: 'WANT' },
+  uncategorized:     { category: 'Other', type: 'WANT' },
 };
 
-export function resolveCategory(cat3: string): { cat2: string; cat1: string } | null {
-  return CATEGORY_HIERARCHY[cat3] ?? null;
+export function resolveCategory(subcategory: string): { category: string; type: string } | null {
+  return CATEGORY_HIERARCHY[subcategory] ?? null;
 }
 
-export function getAllCat3Values(): string[] {
+export function getAllSubcategoryValues(): string[] {
   return Object.keys(CATEGORY_HIERARCHY);
 }
 
-export function getAllCat2Values(): string[] {
-  return [...new Set(Object.values(CATEGORY_HIERARCHY).map(v => v.cat2))];
+export function getAllCategoryValues(): string[] {
+  return [...new Set(Object.values(CATEGORY_HIERARCHY).map(v => v.category))];
 }
 
-export function getAllCat1Values(): string[] {
-  return [...new Set(Object.values(CATEGORY_HIERARCHY).map(v => v.cat1))];
+export function getAllTypeValues(): string[] {
+  return [...new Set(Object.values(CATEGORY_HIERARCHY).map(v => v.type))];
 }

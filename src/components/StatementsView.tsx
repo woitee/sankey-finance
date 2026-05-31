@@ -49,7 +49,7 @@ type ReparsePlan = {
     bankAccountNumber?: string;
     datePosted: string;
     dateExecuted: string;
-    type: string;
+    transactionType: string;
     cardholderName: string;
     accountIdentifier: string;
     merchantName: string;
@@ -180,7 +180,7 @@ export function StatementsView({ from, to }: { from: string; to: string }) {
         bankAccountNumber: parsed.accountNumber || undefined,
         datePosted: tx.datePosted,
         dateExecuted: tx.dateExecuted,
-        type: tx.type,
+        transactionType: tx.type,
         cardholderName: tx.cardholderName,
         accountIdentifier: tx.accountIdentifier,
         merchantName: tx.merchantName,
