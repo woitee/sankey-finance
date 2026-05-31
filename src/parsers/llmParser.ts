@@ -1,5 +1,6 @@
+import type { ConvexReactClient } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import type { BankParser, ParsedStatement } from './types';
-import { authFetch } from '../auth/fetch';
 
 async function fileToText(file: File): Promise<string> {
   if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
@@ -23,23 +24,19 @@ async function fileToText(file: File): Promise<string> {
 
 export class LlmParser implements BankParser {
   readonly name = 'AI (LLM)';
+  private client: ConvexReactClient | null = null;
 
-  /** LLM parser is never auto-selected — user must explicitly approve. */
+  setClient(client: ConvexReactClient) {
+    this.client = client;
+  }
+
   async detect(_file: File): Promise<boolean> {
     return false;
   }
 
   async parse(file: File): Promise<ParsedStatement> {
+    if (!this.client) throw new Error('Convex client not set on LlmParser — call setClient() first');
     const text = await fileToText(file);
-    const res = await authFetch('/api/parse-statement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(`LLM parse error (${res.status}): ${err.error ?? res.statusText}`);
-    }
-    return res.json() as Promise<ParsedStatement>;
+    return await this.client.action(api.llm.parseStatement, { text }) as ParsedStatement;
   }
 }

@@ -1,3 +1,4 @@
+import type { ConvexReactClient } from 'convex/react';
 import type { Transaction } from '../types/transaction';
 import { resolveCategory, getAllCat3Values } from '../config/categories';
 import { createLLMProvider } from './llm';
@@ -28,9 +29,9 @@ export function matchesRule(tx: Transaction, rule: ActiveRule): boolean {
 
 export async function categorizeTransactions(
   transactions: Transaction[],
-  options: { useLLM?: boolean; activeRules?: ActiveRule[] } = {},
+  options: { useLLM?: boolean; activeRules?: ActiveRule[]; convexClient?: ConvexReactClient } = {},
 ): Promise<CategorizationResult> {
-  const { useLLM = true, activeRules = [] } = options;
+  const { useLLM = true, activeRules = [], convexClient } = options;
   const result = [...transactions];
   const needsLLM: { index: number; request: CategorizationRequest }[] = [];
 
@@ -79,7 +80,8 @@ export async function categorizeTransactions(
 
   if (needsLLM.length > 0 && useLLM) {
     try {
-      const provider = createLLMProvider();
+      if (!convexClient) throw new Error('convexClient is required for LLM categorization');
+      const provider = createLLMProvider(convexClient);
       const validCat3 = getAllCat3Values();
       const llmResult = await provider.categorize(
         needsLLM.map(n => n.request),

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useConvex } from 'convex/react';
 import type { Transaction } from '../types/transaction';
 import type { ActiveRule } from '../services/categorizer';
 import { categorizeTransactions, matchesRule } from '../services/categorizer';
@@ -125,6 +126,7 @@ export function CategorizeModal({
   onClose,
   onViewCandidates,
 }: Props) {
+  const convex = useConvex();
   const counts = computeDryRunCounts(transactions, activeRules);
   const [phase, setPhase] = useState<Phase>({ kind: 'preview', counts });
 
@@ -173,7 +175,7 @@ export function CategorizeModal({
         .filter(({ tx }) => !tx.cat3 && tx.amount < 0);
 
       const validCat3 = getAllCat3Values();
-      const provider = createLLMProvider();
+      const provider = createLLMProvider(convex);
       const allRuleSuggestions: RuleSuggestion[] = [];
 
       // Step 3: process each batch with live timer

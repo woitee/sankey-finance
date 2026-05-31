@@ -15,7 +15,7 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 ## Features
 
 - **Import** — PDF bank statements (Air Bank CZ, CSOB CZ) via built-in PDF parsers; AI-assisted parser for other formats
-- **Auto-categorize** — active rules run first, then LLM (server-side via Vite plugin) for anything remaining
+- **Auto-categorize** — active rules run first, then LLM (via Convex action) for anything remaining
 - **3-tier categories** — `cat1` (MUST / WANT / INCOME) → `cat2` (Food, Transport…) → `cat3` (groceries, fuel…)
 - **Categorization rules** — pattern matching on merchant name or details; candidate rules from AI require approval
 - **Manual overrides** — click any cell in the transaction table to edit a category directly
@@ -23,6 +23,10 @@ Personal finance dashboard for Czech bank accounts. Parses bank statements, auto
 - **Transaction grouping** — select multiple transactions and merge them into a labeled group
 - **Multi-account** — multiple bank accounts, filterable in the UI
 - **Bank sync** — extensible provider registry for live bank integrations (OAuth + token encryption)
+
+## Prerequisites
+
+- **Node.js 18+**
 
 ## Getting started
 
@@ -32,8 +36,11 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Fill in the required vars from .env.example
-# TOKEN_ENCRYPTION_KEY must be set as a Convex server env var:
+# Fill in VITE_CONVEX_URL and VITE_CONVEX_SITE_URL from your Convex dashboard
+
+# Set Convex server env vars (at minimum the LLM API key for your provider):
+npx convex env set ANTHROPIC_API_KEY sk-ant-...
+# Optional: bank token encryption key (needed for bank sync feature)
 npx convex env set TOKEN_ENCRYPTION_KEY $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
 # Start everything (Convex + frontend)
@@ -44,21 +51,24 @@ npx convex dev
 npm run dev
 ```
 
-Environment variables used by the app:
+### Frontend environment variables (`.env`)
 
 - `VITE_CONVEX_URL` - required; frontend Convex deployment URL
 - `VITE_CONVEX_SITE_URL` - required for bank OAuth from the frontend
-- `CONVEX_SITE_URL` - optional server-side variant of `VITE_CONVEX_SITE_URL`; `convex/bankAuth.ts` accepts either one
-- `LLM_PROVIDER` - optional; one of `anthropic`, `openai`, `google` (defaults to `anthropic`)
-- `LLM_MODEL` - optional; defaults depend on `LLM_PROVIDER`
-- `ANTHROPIC_API_KEY` - required when `LLM_PROVIDER=anthropic`
-- `OPENAI_API_KEY` - required when `LLM_PROVIDER=openai`
-- `GOOGLE_API_KEY` - required when `LLM_PROVIDER=google`
-- `TOKEN_ENCRYPTION_KEY` - required for bank token encryption; used by Convex server code and best set with `npx convex env set ...`
 - `VITE_CURRENCY` - optional UI currency override; defaults to `CZK`
 - `VITE_AUTH_PROVIDER` - optional; set to `clerk` to enable authentication (see below)
 - `VITE_CLERK_PUBLISHABLE_KEY` - required when `VITE_AUTH_PROVIDER=clerk`
-- `AUTH_ISSUER_URL` - required when `VITE_AUTH_PROVIDER=clerk`; Clerk OIDC issuer URL for Vite middleware JWT verification
+
+### Convex environment variables (`npx convex env set` / `npx convex env list`)
+
+- `ANTHROPIC_API_KEY` - required when `LLM_PROVIDER=anthropic` (default)
+- `OPENAI_API_KEY` - required when `LLM_PROVIDER=openai`
+- `GOOGLE_API_KEY` - required when `LLM_PROVIDER=google`
+- `LLM_PROVIDER` - optional; one of `anthropic`, `openai`, `google` (defaults to `anthropic`)
+- `LLM_MODEL` - optional; defaults depend on `LLM_PROVIDER`
+- `TOKEN_ENCRYPTION_KEY` - required for bank token encryption
+- `CLERK_ISSUER_URL` - required when `VITE_AUTH_PROVIDER=clerk`
+- `CONVEX_SITE_URL` - optional; `convex/bankAuth.ts` accepts either this or `VITE_CONVEX_SITE_URL`
 
 ## Authentication (optional)
 
@@ -69,7 +79,6 @@ Auth is **disabled by default** — the app runs wide open, which is fine for lo
    ```
    VITE_AUTH_PROVIDER=clerk
    VITE_CLERK_PUBLISHABLE_KEY=pk_...
-   AUTH_ISSUER_URL=https://your-app.clerk.accounts.dev
    ```
 3. Set the Convex env var so Convex validates the same JWTs:
    ```bash
@@ -78,14 +87,41 @@ Auth is **disabled by default** — the app runs wide open, which is fine for lo
 
 When enabled, this protects:
 - **Frontend** — shows a Clerk sign-in screen; unauthenticated users can't see the app
-- **Vite LLM endpoints** (`/api/categorize`, `/api/parse-statement`) — verified via JWKS (jose)
-- **Convex** — JWTs validated via `convex/auth.config.ts`
+- **Convex** — JWTs validated via `convex/auth.config.ts`; all backend functions (including LLM actions) are protected
 
-The auth layer is pluggable — see `src/auth/types.ts` for the provider interface. To add a new provider (e.g. Auth0), create `src/auth/<name>.tsx` and add a case in `main.tsx` + `vite-auth.ts`.
+The auth layer is pluggable — see `src/auth/types.ts` for the provider interface. To add a new provider (e.g. Auth0), create `src/auth/<name>.tsx` and add a case in `main.tsx`.
+
+## Self-hosting Convex (optional)
+
+By default the app uses [Convex Cloud](https://convex.dev) — just run `npx convex dev` and it handles everything. If you prefer to run the backend yourself, Convex is [open-source and self-hostable](https://github.com/get-convex/convex-backend).
+
+**Requirements:** Docker
+
+```bash
+# Download docker-compose.yml from the Convex repo
+curl -O https://raw.githubusercontent.com/get-convex/convex-backend/main/self-hosted/docker-compose.yml
+
+# Start the backend + dashboard
+docker compose up -d
+
+# Generate an admin key
+docker compose exec backend ./generate_admin_key.sh
+```
+
+Then configure your project to point at the local backend instead of the cloud. In `.env.local`:
+
+```
+CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210
+CONVEX_SELF_HOSTED_ADMIN_KEY=<your admin key>
+VITE_CONVEX_URL=http://127.0.0.1:3210
+VITE_CONVEX_SITE_URL=http://127.0.0.1:3211
+```
+
+The self-hosted dashboard is available at `http://localhost:6791`. See the [self-hosting guide](https://github.com/get-convex/convex-backend/blob/main/self-hosted/README.md) for production storage options (Postgres, S3, etc.).
 
 ## Importing statements
 
-Use the **Import** button in the UI to upload the JSON.
+Use the **Import** button in the UI to upload a PDF.
 
 **Built-in PDF import:**
 
@@ -123,12 +159,11 @@ src/
   components/       # React UI (SettingsView, TransactionTable, charts…)
   config/           # Category hierarchy
   parsers/          # Bank statement parsers (Air Bank, CSOB, LLM fallback)
-  services/         # Categorizer, LLM provider
+  services/         # Categorizer, LLM provider (calls Convex actions)
   transforms/       # Sankey builder, summary, grouping
   types/
 convex/             # Backend: schema, queries, mutations, actions
+  llm.ts            # AI categorization + statement parsing (Node.js actions)
   banks/            # Bank provider registry (extend for live sync)
-vite-llm-plugin.ts  # Vite middleware: /api/categorize, /api/parse-statement
-vite-auth.ts        # Vite middleware: JWT verification (JWKS via jose)
 scripts/            # Python PDF parser
 ```

@@ -78,6 +78,7 @@ function formatTimestamp(value: string): string {
 
 export function StatementsView({ from, to }: { from: string; to: string }) {
   const convex = useConvex();
+  llmParser.setClient(convex);
   const storedStatements = useQuery(api.imports.listStoredStatements, { from, to }) as StoredStatement[] | undefined;
   const [selectedId, setSelectedId] = useState<Id<'imports'> | null>(null);
   const [reparseState, setReparseState] = useState<{ id: Id<'imports'>; message: string } | null>(null);

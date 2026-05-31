@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import type { Id } from '../../convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 import { detectParser, PARSERS } from '../parsers/registry';
@@ -59,6 +59,9 @@ const btn = (bg: string, color: string, disabled?: boolean): React.CSSProperties
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ImportModal({ onClose }: { onClose: () => void }) {
+  const convex = useConvex();
+  llmParser.setClient(convex);
+
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [llmApproved, setLlmApproved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

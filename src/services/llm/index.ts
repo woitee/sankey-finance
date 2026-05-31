@@ -1,8 +1,8 @@
-import { HttpProvider } from './http-provider';
+import type { ConvexReactClient } from 'convex/react';
+import { ConvexProvider } from './convex-provider';
 
 export type { LLMProvider, CategorizationRequest, CategorizationResponse, RuleSuggestion } from './types';
-export { HttpProvider };
 
-export function createLLMProvider() {
-  return new HttpProvider();
+export function createLLMProvider(convexClient: ConvexReactClient) {
+  return new ConvexProvider(convexClient);
 }

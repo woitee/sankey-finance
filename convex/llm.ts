@@ -1,52 +1,72 @@
-import { generateObject, generateText } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { z } from 'zod';
-import type { Plugin } from 'vite';
-import type { LanguageModel } from 'ai';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { getAllCat2Values } from './src/config/categories';
-import { createVerifier, authMiddleware } from './vite-auth';
+"use node";
+
+import { v } from "convex/values";
+import { action } from "./_generated/server";
+import { generateObject, generateText } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { z } from "zod";
+import type { LanguageModel } from "ai";
+import { getAllCat2Values } from "../src/config/categories";
 
 const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-haiku-4-5',
-  openai: 'gpt-4.1-mini',
-  google: 'gemini-2.5-flash',
+  anthropic: "claude-haiku-4-5",
+  openai: "gpt-4.1-mini",
+  google: "gemini-2.5-flash",
 };
 
-function createModel(env: Record<string, string>): LanguageModel {
-  const providerName = env.LLM_PROVIDER || 'anthropic';
-  const modelName = env.LLM_MODEL || DEFAULT_MODELS[providerName] || DEFAULT_MODELS.anthropic;
+function createModel(): LanguageModel {
+  const providerName = process.env.LLM_PROVIDER || "anthropic";
+  const modelName =
+    process.env.LLM_MODEL ||
+    DEFAULT_MODELS[providerName] ||
+    DEFAULT_MODELS.anthropic;
   switch (providerName) {
-    case 'anthropic':
-      return createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(modelName);
-    case 'openai':
-      return createOpenAI({ apiKey: env.OPENAI_API_KEY })(modelName);
-    case 'google':
-      return createGoogleGenerativeAI({ apiKey: env.GOOGLE_API_KEY })(modelName);
+    case "anthropic":
+      return createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })(
+        modelName,
+      );
+    case "openai":
+      return createOpenAI({ apiKey: process.env.OPENAI_API_KEY })(modelName);
+    case "google":
+      return createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_API_KEY })(
+        modelName,
+      );
     default:
-      throw new Error(`Unknown LLM provider: "${providerName}". Supported: anthropic, openai, google`);
+      throw new Error(
+        `Unknown LLM provider: "${providerName}". Supported: anthropic, openai, google`,
+      );
   }
 }
 
 function buildResponseSchema(validCat2Values: [string, ...string[]]) {
   const cat2Enum = z.enum(validCat2Values);
   return z.object({
-    categories: z.array(z.object({
-      index: z.number(),
-      cat1: z.enum(['MUST', 'WANT', 'MUST/WANT', 'INCOME']),
-      cat2: cat2Enum,
-      cat3: z.string(),
-    })),
-    rules: z.array(z.object({
-      pattern: z.string(),
-      field: z.enum(['merchantName', 'details']),
-      matchType: z.enum(['contains', 'exact', 'startsWith', 'word', 'regex']),
-      cat1: z.enum(['MUST', 'WANT', 'MUST/WANT', 'INCOME']),
-      cat2: cat2Enum,
-      cat3: z.string(),
-    })),
+    categories: z.array(
+      z.object({
+        index: z.number(),
+        cat1: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
+        cat2: cat2Enum,
+        cat3: z.string(),
+      }),
+    ),
+    rules: z.array(
+      z.object({
+        pattern: z.string(),
+        field: z.enum(["merchantName", "details"]),
+        matchType: z.enum([
+          "contains",
+          "exact",
+          "startsWith",
+          "word",
+          "regex",
+        ]),
+        cat1: z.enum(["MUST", "WANT", "MUST/WANT", "INCOME"]),
+        cat2: cat2Enum,
+        cat3: z.string(),
+      }),
+    ),
   });
 }
 
@@ -70,7 +90,7 @@ async function categorizeBatch(
       (r, i) =>
         `${i + 1}. Merchant: "${r.merchantName}" | Details: "${r.details}" | Amount: ${r.amount} | Type: ${r.transactionType}`,
     )
-    .join('\n');
+    .join("\n");
 
   const { object } = await generateObject({
     model,
@@ -84,7 +104,7 @@ cat1 rules (no exceptions):
 - WANT = discretionary spending (restaurants, entertainment, clothes, subscriptions, gadgets, etc.)
 - MUST/WANT = expenses that are partially necessary and partially discretionary; split 50/50 between MUST and WANT in reporting. Primary use case: restaurant meals and takeout/delivery (eating is necessary, but choosing a restaurant is discretionary). Also applies to other mixed-necessity purchases where the same transaction covers both a need and a want.
 
-cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(', ')}.
+cat2 is the sub-group. You MUST use ONLY one of these exact values (case-sensitive): ${validCat2Values.join(", ")}.
 Do NOT invent new cat2 values. If unsure, use "Other".
 
 Category reference (examples of what belongs where):
@@ -129,7 +149,7 @@ Suggest reusable rules for recurring merchants you recognize with high confidenc
 Rule structure: "pattern" must be the SHORTEST string that uniquely identifies the brand — just the brand name, nothing else. Strip location suffixes, store codes, and transaction noise. Examples: "IKEA" not "IKEA ZLICIN OD ECO", "McDonald" not "McDonald's Praha 5", "Netflix" not "NETFLIX.COM". "matchType" says how: contains/exact/startsWith/word/regex. Prefer contains or word for normal merchants; use regex only when needed. Example: { pattern: "IKEA", field: "merchantName", matchType: "contains", ... }. Omit rules for one-off or ambiguous transactions.`,
     messages: [
       {
-        role: 'user',
+        role: "user",
         content: `Valid cat3 categories: ${JSON.stringify(validCat3Values)}
 
 Transactions to categorize:
@@ -139,42 +159,46 @@ ${transactionList}`,
   });
 
   const responses = batch.map((_, i) => {
-    const entry = object.categories.find(p => p.index === i + 1);
-    const cat3 = entry?.cat3 ?? 'uncategorized';
+    const entry = object.categories.find((p) => p.index === i + 1);
+    const cat3 = entry?.cat3 ?? "uncategorized";
     const isValid = validCat3Values.includes(cat3);
     return {
-      cat1: entry?.cat1 ?? 'WANT',
-      cat2: entry?.cat2 ?? 'Other',
-      cat3: isValid ? cat3 : 'uncategorized',
+      cat1: entry?.cat1 ?? "WANT",
+      cat2: entry?.cat2 ?? "Other",
+      cat3: isValid ? cat3 : "uncategorized",
       confidence: isValid ? 0.8 : 0,
     };
   });
 
-  const MATCH_TYPE_KEYWORDS = new Set(['contains', 'exact', 'startsWith', 'word', 'regex']);
+  const MATCH_TYPE_KEYWORDS = new Set([
+    "contains",
+    "exact",
+    "startsWith",
+    "word",
+    "regex",
+  ]);
   const ruleSuggestions = (object.rules ?? [])
-    .filter(r => r.pattern.trim() && validCat3Values.includes(r.cat3) && !MATCH_TYPE_KEYWORDS.has(r.pattern.trim()))
-    .map(r => ({ ...r, pattern: r.pattern.trim() }));
+    .filter(
+      (r) =>
+        r.pattern.trim() &&
+        validCat3Values.includes(r.cat3) &&
+        !MATCH_TYPE_KEYWORDS.has(r.pattern.trim()),
+    )
+    .map((r) => ({ ...r, pattern: r.pattern.trim() }));
 
   return { responses, ruleSuggestions };
 }
 
-function readBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (chunk: string) => (data += chunk));
-    req.on('end', () => {
-      try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-    });
-    req.on('error', reject);
-  });
-}
-
-async function parseStatement(model: LanguageModel, text: string): Promise<unknown> {
+async function parseStatementText(
+  model: LanguageModel,
+  text: string,
+): Promise<unknown> {
   const { text: responseText } = await generateText({
     model,
-    messages: [{
-      role: 'user',
-      content: `Parse this bank statement. Return ONLY a valid JSON object matching this schema — no markdown, no explanation:
+    messages: [
+      {
+        role: "user",
+        content: `Parse this bank statement. Return ONLY a valid JSON object matching this schema — no markdown, no explanation:
 {
   "period": "YYYY-MM",
   "accountNumber": "string",
@@ -198,54 +222,42 @@ Rules: negative amount = money leaving, positive = money arriving.
 
 Statement text:
 ${text.slice(0, 60_000)}`,
-    }],
+      },
+    ],
   });
-  const json = responseText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+  const json = responseText
+    .replace(/^```(?:json)?\n?/, "")
+    .replace(/\n?```$/, "")
+    .trim();
   return JSON.parse(json);
 }
 
-export function llmPlugin(env: Record<string, string>): Plugin {
-  let verifyAuth: ReturnType<typeof authMiddleware> | null = null;
+// ── Actions ──────────────────────────────────────────────────────────────────
 
-  return {
-    name: 'llm-api',
-    async configureServer(server) {
-      const verifier = await createVerifier(env);
-      verifyAuth = authMiddleware(verifier);
+export const categorize = action({
+  args: {
+    requests: v.array(
+      v.object({
+        merchantName: v.string(),
+        details: v.string(),
+        amount: v.number(),
+        transactionType: v.string(),
+      }),
+    ),
+    validCat3Values: v.array(v.string()),
+  },
+  handler: async (_ctx, { requests, validCat3Values }) => {
+    const model = createModel();
+    return await categorizeBatch(model, requests, validCat3Values);
+  },
+});
 
-      server.middlewares.use('/api/categorize', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-        if (req.method !== 'POST') return next();
-        verifyAuth!(req, res, async () => {
-          try {
-            const body = (await readBody(req)) as { requests: CategorizationRequest[]; validCat3Values: string[] };
-            const model = createModel(env);
-            const result = await categorizeBatch(model, body.requests, body.validCat3Values);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result));
-          } catch (e: any) {
-            console.error('[llm-api] Error:', e?.message ?? e);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
-          }
-        });
-      });
-
-      server.middlewares.use('/api/parse-statement', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-        if (req.method !== 'POST') return next();
-        verifyAuth!(req, res, async () => {
-          try {
-            const body = (await readBody(req)) as { text: string };
-            const model = createModel(env);
-            const result = await parseStatement(model, body.text);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result));
-          } catch (e: any) {
-            console.error('[llm-api] parse-statement error:', e?.message ?? e);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
-          }
-        });
-      });
-    },
-  };
-}
+export const parseStatement = action({
+  args: {
+    text: v.string(),
+  },
+  handler: async (_ctx, { text }) => {
+    const model = createModel();
+    return await parseStatementText(model, text);
+  },
+});
