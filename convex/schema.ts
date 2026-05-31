@@ -28,7 +28,7 @@ export default defineSchema({
     dateExecuted: v.string(),
 
     // Transaction details
-    type: v.string(),
+    type: v.union(v.string(), v.null()),
     transactionType: v.optional(v.string()),
     cardholderName: v.string(),
     accountIdentifier: v.string(),
