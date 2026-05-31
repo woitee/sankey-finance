@@ -3,7 +3,7 @@
  * Usage: node scripts/env-push.mjs
  */
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const SKIP_PREFIXES = ["VITE_"];
 const SKIP_EXACT = new Set(["CONVEX_DEPLOYMENT"]);
@@ -35,17 +35,19 @@ if (vars.length === 0) {
 }
 
 console.log(`Pushing ${vars.length} env var(s) to Convex:\n`);
+for (const { key } of vars) {
+  console.log(`  ${key}`);
+}
+console.log();
+
 for (const { key, value } of vars) {
-  const mask = /KEY|SECRET|TOKEN|PASSWORD/i.test(key);
-  const display = mask && value.length > 8 ? value.slice(0, 8) + "..." : value;
-  console.log(`  ${key}=${display}`);
-  const result = spawnSync("npx", ["convex", "env", "set", key, value], {
-    stdio: "inherit",
-    shell: true,
-  });
-  if (result.status !== 0) {
-    console.error(`\n  Failed to set ${key}`);
+  try {
+    execFileSync("npx", ["convex", "env", "set", key, value], {
+      stdio: "inherit",
+    });
+  } catch {
+    console.error(`Failed to set ${key}`);
     process.exit(1);
   }
 }
-console.log("\nDone.");
+console.log("Done.");
