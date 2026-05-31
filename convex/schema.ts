@@ -38,9 +38,9 @@ export default defineSchema({
     fees: v.number(),
 
     // Categorization (transition: old cat1/cat2/cat3 → type/category/subcategory)
-    cat3: v.union(v.string(), v.null()),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    cat3: v.optional(v.union(v.string(), v.null())),
+    cat2: v.optional(v.union(v.string(), v.null())),
+    cat1: v.optional(v.union(v.string(), v.null())),
     subcategory: v.optional(v.union(v.string(), v.null())),
     category: v.optional(v.union(v.string(), v.null())),
     categorizationSource: v.union(
@@ -98,9 +98,9 @@ export default defineSchema({
     caseSensitive: v.optional(v.boolean()),
     matcher: v.optional(v.any()),
     // Category outcome (transition: old cat1/cat2/cat3 → type/category/subcategory)
-    cat3: v.string(),
-    cat2: v.union(v.string(), v.null()),
-    cat1: v.union(v.string(), v.null()),
+    cat3: v.optional(v.string()),
+    cat2: v.optional(v.union(v.string(), v.null())),
+    cat1: v.optional(v.union(v.string(), v.null())),
     subcategory: v.optional(v.string()),
     category: v.optional(v.union(v.string(), v.null())),
     type: v.optional(v.union(v.string(), v.null())),

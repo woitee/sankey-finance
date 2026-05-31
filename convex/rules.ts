@@ -273,7 +273,7 @@ export const applyRulesToImport = action({
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: matched.cat3, cat2: matched.cat2, cat1: matched.cat1,
+        cat3: matched.cat3 ?? "", cat2: matched.cat2 ?? null, cat1: matched.cat1 ?? null,
         categorizationSource: "rule",
         ruleId: matched._id,
       });
@@ -305,7 +305,7 @@ export const applyAllRules = action({
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: matched.cat3, cat2: matched.cat2, cat1: matched.cat1,
+        cat3: matched.cat3 ?? "", cat2: matched.cat2 ?? null, cat1: matched.cat1 ?? null,
         categorizationSource: "rule",
         ruleId: matched._id,
       });
@@ -334,9 +334,9 @@ export const applyToTransactions = action({
 
       await ctx.runMutation(api.transactions.updateCategories, {
         id: tx._id,
-        cat3: rule.cat3,
-        cat2: rule.cat2,
-        cat1: rule.cat1,
+        cat3: rule.cat3 ?? "",
+        cat2: rule.cat2 ?? null,
+        cat1: rule.cat1 ?? null,
         categorizationSource: "rule",
         ruleId: id,
       });

@@ -38,9 +38,31 @@ export const renameRuleFields = migration({
   },
 });
 
+export const dropOldTransactionFields = migration({
+  table: "transactions",
+  migrateOne: async (ctx, doc) => {
+    const d = doc as any;
+    if (d.cat1 === undefined && d.cat2 === undefined && d.cat3 === undefined) return;
+    const { _id, _creationTime, cat1, cat2, cat3, ...rest } = d;
+    await ctx.db.replace(_id, rest);
+  },
+});
+
+export const dropOldRuleFields = migration({
+  table: "rules",
+  migrateOne: async (ctx, doc) => {
+    const d = doc as any;
+    if (d.cat1 === undefined && d.cat2 === undefined && d.cat3 === undefined) return;
+    const { _id, _creationTime, cat1, cat2, cat3, ...rest } = d;
+    await ctx.db.replace(_id, rest);
+  },
+});
+
 export default internalMutation(async (ctx) => {
   await startMigrationsSerially(ctx, [
     internal.migrations.renameTransactionFields,
     internal.migrations.renameRuleFields,
+    internal.migrations.dropOldTransactionFields,
+    internal.migrations.dropOldRuleFields,
   ]);
 });
