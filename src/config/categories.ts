@@ -42,7 +42,6 @@ export const CATEGORY_HIERARCHY: CategoryHierarchy = {
   board_games:       { category: 'Entertainment', type: 'WANT' },
   concerts_events:   { category: 'Entertainment', type: 'WANT' },
   books:             { category: 'Entertainment', type: 'WANT' },
-  eating_out:        { category: 'Entertainment', type: 'WANT' },
 
   // --- Clothes ---
   clothes:           { category: 'Clothes', type: 'WANT' },
