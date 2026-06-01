@@ -63,9 +63,13 @@ export const CATEGORY_HIERARCHY: CategoryHierarchy = {
   // --- Gifts ---
   gifts:             { category: 'Gifts', type: 'WANT' },
 
+  // --- Household ---
+  furniture:         { category: 'Household', type: 'WANT' },
+  appliances:        { category: 'Household', type: 'WANT' },
+  supplies:          { category: 'Household', type: 'WANT' },
+
   // --- Personal ---
   electronics:       { category: 'Personal', type: 'WANT' },
-  household:         { category: 'Personal', type: 'WANT' },
 
   // --- INCOME ---
   salary:            { category: 'Salary', type: 'INCOME' },

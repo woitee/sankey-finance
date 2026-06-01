@@ -121,7 +121,9 @@ Category reference (examples of what belongs where):
 - public_transport: PID, DPP, Bolt/Uber/Liftago rides, train/bus tickets (IDOS, RegioJet, FlixBus)
 - streaming: Netflix, Spotify, Disney+, Apple TV+, HBO Max, YouTube Premium
 - app_subscription: iCloud, Google One, Adobe, software subscriptions
-- household: home goods — IKEA, Orion, Jysk, Hornbach, OBI, Baumax
+- furniture: furniture — IKEA (furniture orders), Jysk, Kika, Möbelix, sofa/bed/table purchases
+- appliances: household appliances — vacuum cleaner, washing machine, dishwasher, coffee maker, Alza/Datart appliance orders
+- supplies: everyday home consumables and small items — cleaning products, detergents, candles, Hornbach, OBI, Baumax, Orion
 - electronics: Alza, Datart, CZC, Electro World, Apple Store
 - clothes: H&M, Zara, C&A, Pepco, Primark, Next, Reserved
 - clothes_discount: outlet, second-hand, Vinted
