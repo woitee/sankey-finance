@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
+import { authenticatedQuery } from "./lib/auth";
 
-export const list = query({
+export const list = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
@@ -12,7 +13,7 @@ export const list = query({
   },
 });
 
-export const latestByType = query({
+export const latestByType = authenticatedQuery({
   args: { type: v.string() },
   handler: async (ctx, { type }) => {
     return await ctx.db

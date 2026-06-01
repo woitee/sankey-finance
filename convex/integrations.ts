@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
+import { authenticatedMutation } from "./lib/auth";
 import { api } from "./_generated/api";
 import { encrypt, decrypt } from "./lib/crypto";
 
@@ -18,7 +19,7 @@ export const get = query({
 });
 
 /** Create a new integration row in pending_auth state */
-export const create = mutation({
+export const create = authenticatedMutation({
   args: {
     bank: v.string(),
     label: v.string(),
@@ -39,14 +40,14 @@ export const create = mutation({
   },
 });
 
-export const rename = mutation({
+export const rename = authenticatedMutation({
   args: { id: v.id("integrations"), label: v.string() },
   handler: async (ctx, { id, label }) => {
     await ctx.db.patch(id, { label });
   },
 });
 
-export const remove = mutation({
+export const remove = authenticatedMutation({
   args: { id: v.id("integrations") },
   handler: async (ctx, { id }) => {
     await ctx.db.delete(id);

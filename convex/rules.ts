@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
+import { authenticatedAction, authenticatedMutation, authenticatedQuery } from "./lib/auth";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -57,7 +57,7 @@ async function ensureUniqueRuleMatcher(
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
-export const listActive = query({
+export const listActive = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
@@ -67,7 +67,7 @@ export const listActive = query({
   },
 });
 
-export const listCandidates = query({
+export const listCandidates = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
@@ -77,14 +77,14 @@ export const listCandidates = query({
   },
 });
 
-export const get = query({
+export const get = authenticatedQuery({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }) => ctx.db.get(id),
 });
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-export const create = mutation({
+export const create = authenticatedMutation({
   args: {
     pattern: v.string(),
     field: v.union(v.literal("merchantName"), v.literal("details")),
@@ -109,7 +109,7 @@ export const create = mutation({
 
 /** Create multiple candidate rules from AI suggestions, skipping duplicates.
  *  Returns the newly created rule objects (with _id) so callers can apply them immediately. */
-export const batchCreateCandidates = mutation({
+export const batchCreateCandidates = authenticatedMutation({
   args: {
     rules: v.array(v.object({
       pattern: v.string(),
@@ -160,7 +160,7 @@ export const batchCreateCandidates = mutation({
   },
 });
 
-export const approve = mutation({
+export const approve = authenticatedMutation({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }) => {
     const rule = await ctx.db.get(id);
@@ -170,7 +170,7 @@ export const approve = mutation({
   },
 });
 
-export const reject = mutation({
+export const reject = authenticatedMutation({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }) => {
     const rule = await ctx.db.get(id);
@@ -195,7 +195,7 @@ export const reject = mutation({
   },
 });
 
-export const update = mutation({
+export const update = authenticatedMutation({
   args: {
     id: v.id("rules"),
     pattern: v.string(),
@@ -214,7 +214,7 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = authenticatedMutation({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }) => {
     const rule = await ctx.db.get(id);
@@ -254,7 +254,7 @@ function matchesRule(
 }
 
 /** Apply all active rules to transactions from a specific import. */
-export const applyRulesToImport = action({
+export const applyRulesToImport = authenticatedAction({
   args: { importId: v.id("imports") },
   handler: async (ctx, { importId }): Promise<{ updated: number }> => {
     const rules = await ctx.runQuery(api.rules.listActive, {});
@@ -285,7 +285,7 @@ export const applyRulesToImport = action({
 });
 
 /** Apply all active rules to all non-manually-categorized transactions. */
-export const applyAllRules = action({
+export const applyAllRules = authenticatedAction({
   args: {},
   handler: async (ctx): Promise<{ updated: number }> => {
     const rules = await ctx.runQuery(api.rules.listActive, {});
@@ -316,7 +316,7 @@ export const applyAllRules = action({
 });
 
 /** Apply a rule to all non-manually-categorized transactions. Returns count updated. */
-export const applyToTransactions = action({
+export const applyToTransactions = authenticatedAction({
   args: { id: v.id("rules") },
   handler: async (ctx, { id }): Promise<{ updated: number }> => {
     const rule = await ctx.runQuery(api.rules.get, { id });

@@ -1,14 +1,14 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { authenticatedMutation, authenticatedQuery } from "./lib/auth";
 
-export const list = query({
+export const list = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("cardholderNicknames").collect();
   },
 });
 
-export const upsert = mutation({
+export const upsert = authenticatedMutation({
   args: { fullName: v.string(), nickname: v.string() },
   handler: async (ctx, { fullName, nickname }) => {
     const existing = await ctx.db
@@ -23,7 +23,7 @@ export const upsert = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = authenticatedMutation({
   args: { id: v.id("cardholderNicknames") },
   handler: async (ctx, { id }) => {
     await ctx.db.delete(id);

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { authenticatedMutation, authenticatedQuery } from "./lib/auth";
 
-export const list = query({
+export const list = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
@@ -11,7 +11,7 @@ export const list = query({
   },
 });
 
-export const byPeriod = query({
+export const byPeriod = authenticatedQuery({
   args: { period: v.string() },
   handler: async (ctx, { period }) => {
     return await ctx.db
@@ -21,7 +21,7 @@ export const byPeriod = query({
   },
 });
 
-export const upsert = mutation({
+export const upsert = authenticatedMutation({
   args: {
     period: v.string(),
     accountNumber: v.string(),

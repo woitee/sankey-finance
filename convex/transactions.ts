@@ -1,12 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
+import { authenticatedMutation, authenticatedQuery } from "./lib/auth";
 
-export const listAll = query({
+export const listAll = authenticatedQuery({
   args: {},
   handler: async (ctx) => ctx.db.query("transactions").collect(),
 });
 
-export const byImport = query({
+export const byImport = authenticatedQuery({
   args: { importId: v.id("imports") },
   handler: async (ctx, { importId }) => {
     return await ctx.db
@@ -16,7 +17,7 @@ export const byImport = query({
   },
 });
 
-export const inspectReparseConflicts = query({
+export const inspectReparseConflicts = authenticatedQuery({
   args: {
     importId: v.id("imports"),
     originalIds: v.array(v.string()),
@@ -43,7 +44,7 @@ export const inspectReparseConflicts = query({
 });
 
 // Query transactions by date range
-export const byDateRange = query({
+export const byDateRange = authenticatedQuery({
   args: {
     from: v.string(),   // ISO date string "YYYY-MM-DD"
     to: v.string(),     // ISO date string "YYYY-MM-DD"
@@ -59,7 +60,7 @@ export const byDateRange = query({
 });
 
 // Query all transactions for a specific period
-export const byPeriod = query({
+export const byPeriod = authenticatedQuery({
   args: { period: v.string() },
   handler: async (ctx, { period }) => {
     return await ctx.db
@@ -70,7 +71,7 @@ export const byPeriod = query({
 });
 
 // List distinct periods that have transactions
-export const listPeriods = query({
+export const listPeriods = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const statements = await ctx.db.query("statements").collect();
@@ -82,7 +83,7 @@ export const listPeriods = query({
 
 // Distinct cardholder names for actual cardholders (masked card numbers like ****1234)
 // Excludes transfer counterparties whose accountIdentifier is an IBAN/account number
-export const uniqueCardholderNames = query({
+export const uniqueCardholderNames = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const txs = await ctx.db.query("transactions").collect();
@@ -140,7 +141,7 @@ export const upsert = mutation({
 });
 
 // Update categorization fields for a transaction
-export const updateCategories = mutation({
+export const updateCategories = authenticatedMutation({
   args: {
     id: v.id("transactions"),
     subcategory: v.union(v.string(), v.null()),
@@ -161,7 +162,7 @@ export const updateCategories = mutation({
 });
 
 // Update grouping for a transaction
-export const updateGroup = mutation({
+export const updateGroup = authenticatedMutation({
   args: {
     id: v.id("transactions"),
     groupId: v.union(v.string(), v.null()),
@@ -173,7 +174,7 @@ export const updateGroup = mutation({
 });
 
 // Batch-insert new transactions from a file import (skips existing by originalId)
-export const batchUpsert = mutation({
+export const batchUpsert = authenticatedMutation({
   args: {
     transactions: v.array(v.object({
       originalId: v.string(),
@@ -216,7 +217,7 @@ export const batchUpsert = mutation({
 });
 
 // Batch update categorization (for LLM results)
-export const batchUpdateCategories = mutation({
+export const batchUpdateCategories = authenticatedMutation({
   args: {
     updates: v.array(
       v.object({
@@ -243,7 +244,7 @@ export const batchUpdateCategories = mutation({
 });
 
 
-export const batchDelete = mutation({
+export const batchDelete = authenticatedMutation({
   args: { ids: v.array(v.id("transactions")) },
   handler: async (ctx, { ids }) => {
     for (const id of ids) {
@@ -252,7 +253,7 @@ export const batchDelete = mutation({
   },
 });
 
-export const replaceByImport = mutation({
+export const replaceByImport = authenticatedMutation({
   args: {
     importId: v.id("imports"),
     conflictMode: v.union(v.literal("overwrite"), v.literal("skip")),

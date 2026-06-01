@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { authenticatedMutation, authenticatedQuery } from "./lib/auth";
 
-export const list = query({
+export const list = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
@@ -12,7 +12,7 @@ export const list = query({
   },
 });
 
-export const listStoredStatements = query({
+export const listStoredStatements = authenticatedQuery({
   args: {
     from: v.string(),
     to: v.string(),
@@ -56,7 +56,7 @@ export const listStoredStatements = query({
   },
 });
 
-export const findDuplicate = query({
+export const findDuplicate = authenticatedQuery({
   args: {
     filename: v.string(),
     period: v.string(),
@@ -75,21 +75,21 @@ export const findDuplicate = query({
   },
 });
 
-export const generateUploadUrl = mutation({
+export const generateUploadUrl = authenticatedMutation({
   args: {},
   handler: async (ctx) => {
     return await ctx.storage.generateUploadUrl();
   },
 });
 
-export const deleteUploadedFile = mutation({
+export const deleteUploadedFile = authenticatedMutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, { storageId }) => {
     await ctx.storage.delete(storageId);
   },
 });
 
-export const create = mutation({
+export const create = authenticatedMutation({
   args: {
     filename: v.string(),
     parserName: v.string(),
@@ -128,7 +128,7 @@ export const create = mutation({
   },
 });
 
-export const refreshParsedMetadata = mutation({
+export const refreshParsedMetadata = authenticatedMutation({
   args: {
     id: v.id("imports"),
     parserName: v.string(),
@@ -144,7 +144,7 @@ export const refreshParsedMetadata = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = authenticatedMutation({
   args: { id: v.id("imports") },
   handler: async (ctx, { id }) => {
     const existing = await ctx.db.get(id);
