@@ -59,6 +59,11 @@ export const CATEGORY_HIERARCHY: CategoryHierarchy = {
   vet:               { category: 'Pet', type: 'MUST' },
   dog_fee:           { category: 'Pet', type: 'MUST' },
 
+  // --- Vacation ---
+  accommodation:     { category: 'Vacation', type: 'WANT' },
+  travel:            { category: 'Vacation', type: 'WANT' },
+  activities:        { category: 'Vacation', type: 'WANT' },
+
   // --- Gifts ---
   gifts:             { category: 'Gifts', type: 'WANT' },
 

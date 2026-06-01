@@ -133,6 +133,9 @@ Category reference (examples of what belongs where):
 - child_supplies: Mothercare, Baby Direkt, drogerie baby items
 - child_toys: Pompo, Sparkys, toy stores
 - child_education: school fees, nursery/daycare (školka, jesle)
+- accommodation: hotels, Airbnb, Booking.com, pensions, hostels
+- travel: flights (Ryanair, Wizzair), long-distance buses (FlixBus for vacation), ferries; note: RegioJet is usually regular public_transport, not vacation travel
+- activities: tourist attractions, tours, theme parks, museums (vacation context)
 - gifts: flower shops, gift shops, presents
 - highway_toll: dálniční known (toll stickers/charges)
 - car_wash: car wash services
