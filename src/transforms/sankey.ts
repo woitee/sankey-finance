@@ -1,5 +1,5 @@
 import type { Transaction } from '../types/transaction';
-import type { SankeyData, SankeyNode, SankeyLink } from '../types/chart';
+import type { SankeyData, SankeyNode, SankeyLink, IncomeSourceFilter } from '../types/chart';
 
 const TYPE_COLORS: Record<string, string> = {
   MUST: '#e87461',
@@ -9,6 +9,8 @@ const TYPE_COLORS: Record<string, string> = {
   Income: '#b0b8c8',
   UNCATEGORIZED: '#9ca3af',
 };
+
+const INCOME_SOURCE_COLOR = '#8f98aa';
 
 const CATEGORY_COLORS: Record<string, string> = {
   Living: '#cf7a6e',
@@ -28,9 +30,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function buildSankeyData(
   transactions: Transaction[],
-  options: { showCat3?: boolean } = {},
+  options: { showCat3?: boolean; showIncomeSources?: boolean } = {},
 ): SankeyData {
-  const { showCat3 = false } = options;
+  const { showCat3 = false, showIncomeSources = false } = options;
   const nodes = new Map<string, SankeyNode>();
   const linkMap = new Map<string, number>();
   const mustWantMap = new Map<string, number>();
@@ -152,6 +154,30 @@ export function buildSankeyData(
     }
   }
 
+  // income source → Income
+  let incomeSources: Record<string, IncomeSourceFilter> | undefined;
+  if (showIncomeSources) {
+    incomeSources = {};
+    const sourceTotals = new Map<string, { total: number; filter: IncomeSourceFilter }>();
+    for (const t of incomeTransactions) {
+      const key = t.subcategory || t.category || 'uncategorized';
+      const filter: IncomeSourceFilter = t.subcategory
+        ? { subcategory: t.subcategory }
+        : t.category ? { category: t.category } : {};
+      const entry = sourceTotals.get(key) ?? { total: 0, filter };
+      entry.total += t.amount;
+      sourceTotals.set(key, entry);
+    }
+    // Downstream nodes are already registered; a name clash would create a cycle
+    const downstreamNodes = new Set(nodes.keys());
+    for (const [key, { total, filter }] of sourceTotals) {
+      const name = downstreamNodes.has(key) ? `${key} (income)` : key;
+      addNode(name, INCOME_SOURCE_COLOR);
+      addLink(name, 'Income', total);
+      incomeSources[name] = filter;
+    }
+  }
+
   const links: SankeyLink[] = [];
   for (const [key, value] of linkMap.entries()) {
     const [source, target] = key.split('\0');
@@ -162,5 +188,6 @@ export function buildSankeyData(
   return {
     nodes: Array.from(nodes.values()),
     links,
+    ...(incomeSources ? { incomeSources } : {}),
   };
 }

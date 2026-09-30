@@ -161,6 +161,7 @@ export default function App() {
   const [categorizeModalTxs, setCategorizeModalTxs] = useState<TxDoc[] | null>(null);
   const [categorizeModalIsAll, setCategorizeModalIsAll] = useState(false);
   const [showCat3, setShowCat3] = useState(false);
+  const [showIncomeSources, setShowIncomeSources] = useState(false);
   const [displaySettings] = useDisplaySettings();
   const [txFilter, setTxFilter] = useState<CategoryFilter>(initialRoute.txFilter);
   const [focusedRuleId, setFocusedRuleId] = useState<string | null>(initialRoute.ruleId);
@@ -604,7 +605,7 @@ export default function App() {
     [transactions, selectedAccount],
   );
   const summary = computeSummary(effectiveTransactions);
-  const sankeyData = buildSankeyData(effectiveTransactions, { showCat3 });
+  const sankeyData = buildSankeyData(effectiveTransactions, { showCat3, showIncomeSources });
 
   const applyRoute = useCallback((route: RouteState) => {
     startTransition(() => {
@@ -851,23 +852,42 @@ export default function App() {
                 }}
               >
                 <h2 style={{ margin: 0, fontSize: 18 }}>Flow</h2>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    color: '#94a3b8',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={showCat3}
-                    onChange={e => setShowCat3(e.target.checked)}
-                  />
-                  Show subcategories
-                </label>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      color: '#94a3b8',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showCat3}
+                      onChange={e => setShowCat3(e.target.checked)}
+                    />
+                    Show subcategories
+                  </label>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      color: '#94a3b8',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showIncomeSources}
+                      onChange={e => setShowIncomeSources(e.target.checked)}
+                    />
+                    Show income sources
+                  </label>
+                </div>
               </div>
               {sankeyData.links.length > 0 ? (
                 <SankeyChart
@@ -875,6 +895,12 @@ export default function App() {
                   height={550}
                   onNodeClick={name => {
                     if (name === 'Income' || name === 'Savings' || name === 'Deficit') return;
+                    const incomeSource = sankeyData.incomeSources?.[name];
+                    if (incomeSource) {
+                      if (!incomeSource.category && !incomeSource.subcategory) return;
+                      navigateTo({ tab: 'transactions', from, to, txFilter: incomeSource, ruleId: null });
+                      return;
+                    }
                     const typeSet = new Set(['MUST', 'WANT', 'INCOME']);
                     const categorySet = new Set(
                       sankeyData.links
@@ -891,6 +917,12 @@ export default function App() {
                   }}
                   onLinkClick={(source, target) => {
                     if (target === 'Savings' || target === 'Deficit') return;
+                    const incomeSource = sankeyData.incomeSources?.[source];
+                    if (incomeSource) {
+                      if (!incomeSource.category && !incomeSource.subcategory) return;
+                      navigateTo({ tab: 'transactions', from, to, txFilter: incomeSource, ruleId: null });
+                      return;
+                    }
                     const typeSet = new Set(['MUST', 'WANT', 'INCOME']);
                     const categorySet = new Set(
                       sankeyData.links

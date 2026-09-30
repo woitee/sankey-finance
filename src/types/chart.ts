@@ -10,9 +10,16 @@ export interface SankeyLink {
   mustWant?: number;
 }
 
+export interface IncomeSourceFilter {
+  category?: string;
+  subcategory?: string;
+}
+
 export interface SankeyData {
   nodes: SankeyNode[];
   links: SankeyLink[];
+  /** Income-source node name → transaction filter it represents (only when showIncomeSources). */
+  incomeSources?: Record<string, IncomeSourceFilter>;
 }
 
 export interface MonthlySummary {
