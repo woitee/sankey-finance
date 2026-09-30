@@ -19,6 +19,7 @@ import type {
   RuleMatchType,
   RuleMatcher,
 } from '../rules/matcher';
+import { useDisplaySettings } from '../hooks/useDisplaySettings';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -56,6 +57,38 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
       {subtitle && (
         <p style={{ margin: '6px 0 0', fontSize: 13, color: '#4a5568' }}>{subtitle}</p>
       )}
+    </div>
+  );
+}
+
+// ── Display ───────────────────────────────────────────────────────────────────
+
+function DisplayToggles() {
+  const [settings, update] = useDisplaySettings();
+
+  const toggleStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    color: '#94a3b8', fontSize: 13, cursor: 'pointer',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <label style={toggleStyle}>
+        <input
+          type="checkbox"
+          checked={settings.showStartingState}
+          onChange={e => update({ showStartingState: e.target.checked })}
+        />
+        Show Starting State
+      </label>
+      <label style={toggleStyle}>
+        <input
+          type="checkbox"
+          checked={settings.showEndingState}
+          onChange={e => update({ showEndingState: e.target.checked })}
+        />
+        Show Ending State
+      </label>
     </div>
   );
 }
@@ -757,6 +790,16 @@ export function SettingsView() {
       <SectionCard>
         <SectionHeader title="Active Rules" subtitle="Applied before AI categorization. Rules can combine nested AND/OR groups, case modes, word matching, and regex." />
         <ActiveRules />
+      </SectionCard>
+
+      {/* ── Display group ── */}
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#45475a', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 4px 4px' }}>
+        Display
+      </div>
+
+      <SectionCard>
+        <SectionHeader title="Dashboard Balances" subtitle="Choose which account balance cards appear on the dashboard summary." />
+        <DisplayToggles />
       </SectionCard>
 
     </div>
