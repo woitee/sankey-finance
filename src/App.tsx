@@ -18,6 +18,7 @@ import { CategorizeModal } from './components/CategorizeModal';
 import { StatementsView } from './components/StatementsView';
 import type { CategorizeResult } from './components/CategorizeModal';
 import { resolveGroups, generateGroupId } from './transforms/groups';
+import { useDisplaySettings } from './hooks/useDisplaySettings';
 
 type Tab = 'dashboard' | 'transactions' | 'statements' | 'settings';
 
@@ -160,6 +161,7 @@ export default function App() {
   const [categorizeModalTxs, setCategorizeModalTxs] = useState<TxDoc[] | null>(null);
   const [categorizeModalIsAll, setCategorizeModalIsAll] = useState(false);
   const [showCat3, setShowCat3] = useState(false);
+  const [displaySettings] = useDisplaySettings();
   const [txFilter, setTxFilter] = useState<CategoryFilter>(initialRoute.txFilter);
   const [focusedRuleId, setFocusedRuleId] = useState<string | null>(initialRoute.ruleId);
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
@@ -339,22 +341,24 @@ export default function App() {
     if (startBalance === null || endBalance === null) return [];
 
     return [
-      {
+      displaySettings.showStartingState && {
         label: 'Starting State',
         value: startBalance,
         color: '#f9c74f',
       },
-      {
+      displaySettings.showEndingState && {
         label: 'Ending State',
         value: endBalance,
         color: '#89b4fa',
       },
-    ];
+    ].filter((card): card is { label: string; value: number; color: string } => Boolean(card));
   }, [
     allTransactions,
     convexEndPeriodTxs,
     convexStartPeriodTxs,
     convexStatements,
+    displaySettings.showEndingState,
+    displaySettings.showStartingState,
     endPeriod,
     from,
     selectedAccount,
